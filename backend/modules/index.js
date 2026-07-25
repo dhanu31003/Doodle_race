@@ -1,15 +1,15 @@
 // RaceGlyph Nakama authoritative room runtime.
 // ES5 is required by Nakama's embedded JavaScript runtime.
 
-var MODULE_NAME = "raceglyph_private_room_v2";
+var MODULE_NAME = "raceglyph_private_room_v3";
 var RPC_CREATE = "raceglyph_create_room";
 var RPC_JOIN = "raceglyph_join_room";
 var RPC_LEAVE = "raceglyph_leave_room";
-var ROOM_DIRECTORY_COLLECTION = "raceglyph_private_room_directory_v2";
-var PROTOCOL = 2;
-var APP_BUILD = "0.2.0";
-var TRACK_SCHEMA_VERSION = 1;
-var TRACK_GENERATOR_VERSION = 2;
+var ROOM_DIRECTORY_COLLECTION = "raceglyph_private_room_directory_v3";
+var PROTOCOL = 3;
+var APP_BUILD = "0.3.0";
+var TRACK_SCHEMA_VERSION = 2;
+var TRACK_GENERATOR_VERSION = 3;
 var SUPPORTED_PLATFORMS = {android: true, ios: true, linux: true, macos: true, web: true, windows: true};
 var MAX_PLAYERS = 12;
 var TICK_RATE = 20;

@@ -8,9 +8,9 @@ The name **RaceGlyph has not received trademark, store-name, domain, or other le
 
 ## What is implemented
 
-- Track Studio: draw, closure guidance, undo/redo/clear, deterministic validation and auto-fix preview, generation, tour, save/reload/edit/export/delete, and same-room multiplayer authoring.
-- Deterministic circuits: canonical versioned JSON, content hashes, road/curbs/runoff/barriers, pits, grid, checkpoints, lanes, minimap, bridges, recovery data, and seeded forest decoration.
-- Offline racing: one player plus 1–11 AI opponents, conventional steering/accelerator/brake-reverse controls, assists, collisions, recovery, cockpit/chase views, HUD/results/pause, effects, and category audio.
+- Track Studio: draw, closure guidance, undo/redo/clear, deterministic validation, very-local extreme-corner rounding, automatic safe grid/bridge placement, direct generation/tour, a separate World & Road section, save/reload/edit/export/delete, and same-room multiplayer authoring.
+- Deterministic circuits: canonical versioned JSON, content hashes, road/curbs/runoff/barriers, pits, grid, checkpoints, lanes, minimap, bridges, recovery data, seeded forest decoration, and five selectable road surfaces with distinct road texture, vehicle coating, moving effects, and authoritative handling.
+- Offline racing: one player plus 1–11 AI opponents, conventional steering/accelerator/brake-reverse controls, assists, collisions, recovery, bounded gravity-driven crest airtime, smoothly grade-following cockpit/chase views, HUD/pause, a live post-finish full-field classification with exact times, effects, and category audio.
 - Content and presentation: six predefined circuits, eight original fictional car colorways, a complete forest theme, responsive safe-area UI, accessibility controls, credits, and licenses.
 - Private multiplayer: up to 12 humans through pinned Nakama/PostgreSQL, anonymous sessions, create/code-join, host authority, explicit lock/readiness, custom-track hash verification, relay/prediction, reconnect, host departure, results/share/rematch, and offline fallback. Private-room AI fill is intentionally deferred from v1.
 - Local data controls: atomic versioned persistence, corruption fallback/migrations, portable local export, and Delete All Local Data with runtime token/session clearing.

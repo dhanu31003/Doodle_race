@@ -5,6 +5,7 @@ const SAMPLES_PER_SEGMENT := 12
 const ROAD_WIDTH := 58.0
 const WorldPlannerType := preload("res://game/track/features/track_world_feature_planner.gd")
 const FeatureGeometry := preload("res://game/track/features/track_feature_geometry.gd")
+const RoadSurfaceCatalogType := preload("res://game/content/road_surface_catalog.gd")
 const TREE_TEXTURE: Texture2D = preload("res://assets/final/scenery/tree_canopy.svg")
 const GRANDSTAND_TEXTURE: Texture2D = preload("res://assets/final/scenery/grandstand.svg")
 const PIT_BUILDING_TEXTURE: Texture2D = preload("res://assets/final/scenery/pit_building.svg")
@@ -399,7 +400,7 @@ func _draw_pit_lane() -> void:
 	var lane_width := clampf(planned_width, 9.0, maxf(10.0, road_width * 0.68))
 	draw_polyline(lane, Color("315b3b"), lane_width + 16.0, true)
 	draw_polyline(lane, WORLD_GRAVEL, lane_width + 9.0, true)
-	draw_polyline(lane, WORLD_ASPHALT, lane_width, true)
+	draw_polyline(lane, _road_color(), lane_width, true)
 	var left_edge := _offset_polyline(lane, lane_width * 0.52)
 	var right_edge := _offset_polyline(lane, -lane_width * 0.52)
 	draw_polyline(left_edge, Color(0.95, 0.98, 1.0, 0.72), 2.0, true)
@@ -414,9 +415,15 @@ func _draw_road() -> void:
 	# Soil, gravel and kerb layers follow the same centerline as the asphalt so
 	# the circuit reads as a constructed surface embedded in terrain.
 	draw_polyline(curve, Color("315b3b"), road_width + 30.0, true)
-	draw_polyline(curve, WORLD_GRAVEL, road_width + 20.0, true)
+	var profile := _road_surface_profile()
+	draw_polyline(
+		curve,
+		profile.get("runoff_color", WORLD_GRAVEL),
+		road_width + 20.0,
+		true
+	)
 	draw_polyline(curve, Color("e3e1d7"), road_width + 8.0, true)
-	draw_polyline(curve, WORLD_ASPHALT, road_width, true)
+	draw_polyline(curve, _road_color(), road_width, true)
 	for i in range(curve.size() - 1):
 		if i % 4 >= 2:
 			continue
@@ -426,7 +433,83 @@ func _draw_road() -> void:
 		draw_line(curve[i] + normal * (road_width * 0.5 + 3.0), curve[i + 1] + normal * (road_width * 0.5 + 3.0), color, 7.0, true)
 		draw_line(curve[i] - normal * (road_width * 0.5 + 3.0), curve[i + 1] - normal * (road_width * 0.5 + 3.0), color, 7.0, true)
 	for i in range(0, curve.size() - 2, 6):
-		draw_line(curve[i], curve[mini(i + 2, curve.size() - 1)], Color(0.92, 0.96, 1.0, 0.20), 1.5, true)
+		var texture_alpha := 0.10 if _road_surface() == RoadSurfaceCatalogType.SMOOTH_ASPHALT else 0.22
+		draw_line(
+			curve[i], curve[mini(i + 2, curve.size() - 1)],
+			Color(0.92, 0.96, 1.0, texture_alpha), 1.5, true
+		)
+	_draw_road_surface_details()
+
+
+func _draw_road_surface_details() -> void:
+	var style := _road_surface()
+	match style:
+		RoadSurfaceCatalogType.WEATHERED_ASPHALT:
+			for index in range(3, curve.size() - 3, 11):
+				var tangent := (curve[index + 1] - curve[index - 1]).normalized()
+				var normal := Vector2(-tangent.y, tangent.x)
+				var center := curve[index]
+				draw_polyline(PackedVector2Array([
+					center - tangent * 7.0 - normal * road_width * 0.24,
+					center - tangent * 1.0 + normal * road_width * 0.08,
+					center + tangent * 7.0 - normal * road_width * 0.18,
+				]), Color(0.055, 0.060, 0.060, 0.72), 2.0, true)
+		RoadSurfaceCatalogType.BUMPY_ASPHALT:
+			for index in range(4, curve.size() - 4, 8):
+				var tangent := (curve[index + 1] - curve[index - 1]).normalized()
+				var normal := Vector2(-tangent.y, tangent.x)
+				var center := curve[index]
+				var half_length := 6.0 + float(index % 3) * 2.0
+				var half_width := road_width * (0.22 + float(index % 4) * 0.035)
+				draw_colored_polygon(PackedVector2Array([
+					center - tangent * half_length - normal * half_width,
+					center + tangent * half_length - normal * half_width,
+					center + tangent * half_length + normal * half_width,
+					center - tangent * half_length + normal * half_width,
+				]), Color(0.09, 0.105, 0.11, 0.66))
+				draw_polyline(PackedVector2Array([
+					center - tangent * half_length - normal * half_width,
+					center + tangent * half_length - normal * half_width,
+					center + tangent * half_length + normal * half_width,
+				]), Color(0.70, 0.72, 0.70, 0.48), 1.2, true)
+		RoadSurfaceCatalogType.COMPACT_GRAVEL:
+			for index in range(2, curve.size() - 2, 3):
+				var tangent := (curve[index + 1] - curve[index - 1]).normalized()
+				var normal := Vector2(-tangent.y, tangent.x)
+				for stone in 3:
+					var signed_offset := (
+						fposmod(float(index * 37 + stone * 53), 101.0) / 100.0 - 0.5
+					) * road_width * 0.78
+					var radius := 1.0 + float((index + stone) % 3) * 0.42
+					draw_circle(
+						curve[index] + normal * signed_offset + tangent * float(stone - 1) * 2.6,
+						radius,
+						Color("d7c18e") if stone % 2 == 0 else Color("5a4e3a")
+					)
+		RoadSurfaceCatalogType.MUD:
+			var left_rut := _offset_polyline(curve, road_width * 0.19)
+			var right_rut := _offset_polyline(curve, -road_width * 0.19)
+			draw_polyline(left_rut, Color(0.12, 0.075, 0.045, 0.74), maxf(3.0, road_width * 0.09), true)
+			draw_polyline(right_rut, Color(0.12, 0.075, 0.045, 0.74), maxf(3.0, road_width * 0.09), true)
+			for index in range(5, curve.size() - 2, 13):
+				draw_circle(
+					curve[index], maxf(2.5, road_width * 0.11),
+					Color(0.08, 0.065, 0.055, 0.62)
+				)
+
+
+func _road_surface() -> StringName:
+	if compiled_track == null:
+		return RoadSurfaceCatalogType.SMOOTH_ASPHALT
+	return RoadSurfaceCatalogType.sanitized_style(compiled_track.road_surface)
+
+
+func _road_surface_profile() -> Dictionary:
+	return RoadSurfaceCatalogType.profile(_road_surface())
+
+
+func _road_color() -> Color:
+	return _road_surface_profile().get("road_color", WORLD_ASPHALT)
 
 func _draw_checkpoints() -> void:
 	if compiled_track == null:

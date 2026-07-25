@@ -1,14 +1,14 @@
 # Multiplayer Network Protocol
 
-Status: **implemented v2 protocol contract**. This document describes the current wire and room semantics; test outcomes belong in `TEST_REPORT.md`. Nakama relayed host authority is selected in ADR 0002. Local implementation is not evidence of a public, TLS-fronted, or physical-device multiplayer service.
+Status: **implemented v3 protocol contract**. This document describes the current wire and room semantics; test outcomes belong in `TEST_REPORT.md`. Nakama relayed host authority is selected in ADR 0002. Local implementation is not evidence of a public, TLS-fronted, or physical-device multiplayer service.
 
 ## Model
 
-- Up to 12 friends in a private room. Optional AI fill is deferred from protocol v2; no client or backend may silently create AI occupants.
+- Up to 12 friends in a private room. Optional AI fill is deferred from protocol v3; no client or backend may silently create AI occupants.
 - Nakama authenticates anonymous installs, resolves short room codes, manages presence/match lifecycle, and relays match data.
 - One client is the casual-room simulation host. Guests send bounded inputs; host broadcasts authoritative state and race events.
 - Local car prediction and remote interpolation hide ordinary latency; host corrections always win.
-- No ranked mode, prizes, or strong anti-cheat in v2. A malicious host can cheat.
+- No ranked mode, prizes, or strong anti-cheat in v3. A malicious host can cheat.
 
 ## Compatibility handshake
 
@@ -19,14 +19,14 @@ app_build, protocol_version, track_schema_version,
 generator_version, platform
 ```
 
-Current protocol version is `2` and the matching application build is `0.2.0`. Protocol 2 is the Formula-dynamics compatibility boundary: protocol-1 peers are rejected before admission so their different gearbox/steering predictors cannot share authority. An exact tuple is required before a room reservation or match presence is created. Unknown/unsupported values return `update_required`; the client presents a blocking update surface with an offline-play escape, and there is no silent downgrade. After admission, canonical definition hash and generation status travel in `TRACK_MANIFEST`/`GENERATION_REPORT` and gate Ready independently.
+Current protocol version is `3` and the matching application build is `0.3.0`; the tuple also requires track schema `2` and generator `3`. Protocol 3 is the road-surface and airborne-dynamics compatibility boundary: older peers are rejected before admission so predictors with different grip, rolling, crest-launch, or vertical-offset rules cannot share authority. An exact tuple is required before a room reservation or match presence is created. Unknown/unsupported values return `update_required`; the client presents a blocking update surface with an offline-play escape, and there is no silent downgrade. After admission, canonical definition hash and generation status travel in `TRACK_MANIFEST`/`GENERATION_REPORT` and gate Ready independently.
 
 ## Envelope
 
 Every application message contains `protocol`, `opcode`, `room_epoch`, `sender_id`, `seq`, and payload. Tick-bound messages also contain `tick`; bounded request flows may include an optional `request_id`. Binary encoding may replace canonical JSON after golden cross-platform codecs exist; semantics and limits remain versioned.
 
 - `room_epoch` changes whenever a room authority/session is recreated and rejects stale packets.
-- `seq` is monotonic per sender/opcode and bounded to JavaScript's maximum safe integer. Protocol 2 does not wrap a live sequence.
+- `seq` is monotonic per sender/opcode and bounded to JavaScript's maximum safe integer. Protocol 3 does not wrap a live sequence.
 - Server-assigned identity is used; a claimed payload identity never overrides transport identity.
 - Strings, arrays, rates, numbers, and payload bytes are bounded before allocation/use.
 
@@ -34,10 +34,10 @@ Every application message contains `protocol`, `opcode`, `room_epoch`, `sender_i
 
 | Opcode | Message | Delivery | Sender → receiver |
 |---:|---|---|---|
-| 1 | `HELLO` / compatibility (reserved; v2 admission uses authenticated RPC) | reliable | peer ↔ authority |
+| 1 | `HELLO` / compatibility (reserved; v3 admission uses authenticated RPC) | reliable | peer ↔ authority |
 | 2 | `ROOM_CONFIG` | reliable | host → peers |
 | 3 | `TRACK_MANIFEST` | reliable | host → peers |
-| 4 | `TRACK_CHUNK` | reserved/unimplemented in v2 | — |
+| 4 | `TRACK_CHUNK` | reserved/unimplemented in v3 | — |
 | 5 | `GENERATION_REPORT` | reliable | peer → host |
 | 6 | `READY_STATE` | reliable | peer ↔ host |
 | 7 | `START_AT_TICK` | reliable | host → peers |
@@ -50,19 +50,19 @@ Every application message contains `protocol`, `opcode`, `room_epoch`, `sender_i
 | 14 | `ROOM_ENDED` | reliable | host/backend → peers |
 | 15 | `ERROR` | reliable | authority → peer |
 
-Opcode numbers are reserved by this document and must not be reused with different semantics inside protocol 2.
+Opcode numbers are reserved by this document and must not be reused with different semantics inside protocol 3.
 
 ## Track transfer and ready gate
 
-The host sends only a canonical `TrackDefinition`, never generated road/scenery/pixels. The v2 `TRACK_MANIFEST` carries the complete `track_definition` object, its canonical `source_hash`, `generator_version`, and the host's deterministic `compiled_fingerprint`. Receivers enforce the byte cap before use, validate the full schema and source hash, compile locally, and report the source hash, generator version, and local compiled fingerprint. Start is enabled only when every required participant has a successful matching report and is ready.
+The host sends only a canonical `TrackDefinition`, never generated road/scenery/pixels. The v3 `TRACK_MANIFEST` carries the complete schema-2 `track_definition`, including `road_surface`, its canonical `source_hash`, `generator_version`, and the host's deterministic `compiled_fingerprint`. Receivers enforce the byte cap before use, validate the full schema and source hash, compile locally, and report the source hash, generator version, and local compiled fingerprint. Start is enabled only when every required participant has a successful matching report and is ready.
 
-The canonical definition cap is `32,768` bytes and the application-envelope cap is `65,536` bytes. A schema-v1 definition therefore travels inline; opcode 4 remains reserved and no released client depends on chunk assembly. Compression or chunking would require a versioned protocol change plus decompressed-size, ordering, and ratio caps.
+The canonical definition cap is `32,768` bytes and the application-envelope cap is `65,536` bytes. A schema-v2 definition therefore travels inline; opcode 4 remains reserved and no released client depends on chunk assembly. Compression or chunking would require a versioned protocol change plus decompressed-size, ordering, and ratio caps.
 
 ## Input and snapshots
 
-`INPUT_FRAME` contains the envelope tick/sequence plus `steering`, `throttle`, `brake`, legacy `boost`, and `ack_host_tick`. Steering is an integer in `[-1000,1000]`; throttle and brake are integers in `[0,1000]`. Protocol 2 retains the original `boost` field solely for structural compatibility: it is always serialized `false`, and both client and authority reject `true` as `input_boost_disabled`. No player-accessible boost or nitro control exists. Inputs are normally submitted at 20 Hz, with a hard maximum of 20 frames per sender per second; stale, future, duplicate, malformed, and over-rate frames fail explicitly.
+`INPUT_FRAME` contains the envelope tick/sequence plus `steering`, `throttle`, `brake`, legacy `boost`, and `ack_host_tick`. Steering is an integer in `[-1000,1000]`; throttle and brake are integers in `[0,1000]`. Protocol 3 retains the original `boost` field solely for structural compatibility: it is always serialized `false`, and both client and authority reject `true` as `input_boost_disabled`. No player-accessible boost or nitro control exists. Inputs are normally submitted at 20 Hz, with a hard maximum of 20 frames per sender per second; stale, future, duplicate, malformed, and over-rate frames fail explicitly.
 
-`STATE_SNAPSHOT` contains the authoritative tick and, per active car, `slot`, quantized x/y position, heading, x/y velocity, completed lap, next checkpoint, collision layer/mask, status flags, plus an all-or-nothing Formula telemetry set: `gear`, `engine_rpm_q`, `shift_ticks`, `steering_q`, `slip_angle_q`, `wheel_slip_q`, and `lateral_accel_q`. Flags cover off-track, finished, DNF, and recovery hard-snap parity; boost and an independently trusted progress scalar are not wire fields. The decoder keeps explicit safe defaults for archived v1-shaped snapshots, but the v2 admission handshake prevents old and new live predictors from mixing. Authority runs at 60 Hz, guests normally submit input at 20 Hz, and the host publishes snapshots at 12 Hz within a validated 10–15 Hz range. Clients buffer remote state, interpolate continuous Formula telemetry by tick, step discrete gear/shift state, and reconcile local prediction over a bounded history; recovery and layer transitions use explicit flags/layer fields.
+`STATE_SNAPSHOT` contains the authoritative tick and, per active car, `slot`, quantized x/y position, heading, x/y velocity, completed lap, next checkpoint, collision layer/mask, status flags, plus an all-or-nothing Formula telemetry set: `gear`, `engine_rpm_q`, `shift_ticks`, `steering_q`, `slip_angle_q`, `wheel_slip_q`, and `lateral_accel_q`. Flags cover off-track, finished, DNF, and recovery hard-snap parity; boost and an independently trusted progress scalar are not wire fields. The decoder keeps explicit safe defaults for archived snapshots, but the v3 admission handshake prevents old and new live predictors from mixing. Authority runs at 60 Hz, guests normally submit input at 20 Hz, and the host publishes snapshots at 12 Hz within a validated 10–15 Hz range. Clients buffer remote state, interpolate continuous Formula telemetry by tick, step discrete gear/shift state, and reconcile local prediction over a bounded history; recovery and layer transitions use explicit flags/layer fields.
 
 ## Reliable race events
 
@@ -82,7 +82,7 @@ Only the host may configure/lock/kick/start, author the room track, or restart a
 - Rejoining peer proves session/membership, receives a reliable full snapshot, then resumes deltas.
 - Reconnect-time manifest verification is idempotent: it may update that member's verification result but cannot demote `COUNTDOWN`, `RACING`, `RESULTS`, or `CLOSED` to a lobby phase.
 - Lobby host departure transfers ownership to the oldest connected member; that policy does not apply once countdown or racing has begun.
-- In-race host departure ends the v2 race cleanly with an explanation unless a later ADR and soak suite proves host migration safe.
+- In-race host departure ends the v3 race cleanly with an explanation unless a later ADR and soak suite proves host migration safe.
 - Backend unavailable/maintenance leaves offline play available and shows a retryable multiplayer error.
 
 ## Authority validation

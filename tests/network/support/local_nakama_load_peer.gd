@@ -97,10 +97,10 @@ func start_countdown(room_code: String) -> Dictionary:
 
 func _compatibility() -> Dictionary:
 	return {
-		"app_build": "0.2.0",
+		"app_build": "0.3.0",
 		"protocol_version": PROTOCOL,
-		"track_schema_version": 1,
-		"generator_version": 2,
+		"track_schema_version": 2,
+		"generator_version": 3,
 		"platform": "linux",
 	}
 

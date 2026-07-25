@@ -9,6 +9,7 @@ const CanonicalJsonType := preload("res://game/core/canonical_json.gd")
 const ValidationReportType := preload("res://game/track/validation/validation_report.gd")
 const MigratorType := preload("res://game/track/definition/track_definition_migrator.gd")
 const BridgeCrossingType := preload("res://game/track/definition/bridge_crossing_definition.gd")
+const RoadSurfaceCatalogType := preload("res://game/content/road_surface_catalog.gd")
 
 const DIRECTION_CLOCKWISE: StringName = &"clockwise"
 const DIRECTION_COUNTER_CLOCKWISE: StringName = &"counter_clockwise"
@@ -27,6 +28,7 @@ var direction: StringName = DIRECTION_CLOCKWISE
 var target_length: float = 1200.0
 var track_width: float = 72.0
 var theme: StringName = &"classic"
+var road_surface: StringName = RoadSurfaceCatalogType.SMOOTH_ASPHALT
 var pit_side: StringName = PIT_NONE
 var decoration_density: float = 0.5
 var deterministic_seed: int = 0
@@ -84,6 +86,9 @@ static func from_dictionary(input: Dictionary) -> TrackDefinition:
 	definition.target_length = _safe_float(data.get("target_length"), 0.0)
 	definition.track_width = _safe_float(data.get("track_width"), 0.0)
 	definition.theme = StringName(str(data.get("theme", "")))
+	definition.road_surface = StringName(str(data.get(
+		"road_surface", RoadSurfaceCatalogType.SMOOTH_ASPHALT
+	)))
 	definition.pit_side = StringName(str(data.get("pit_side", "none")))
 	definition.decoration_density = _safe_float(data.get("decoration_density"), 0.0)
 	definition.deterministic_seed = _safe_int(data.get("deterministic_seed"), 0)
@@ -144,6 +149,7 @@ func to_dictionary(include_content_hash: bool = true) -> Dictionary:
 		"target_length": target_length,
 		"track_width": track_width,
 		"theme": str(theme),
+		"road_surface": str(road_surface),
 		"pit_side": str(pit_side),
 		"decoration_density": decoration_density,
 		# Decimal text preserves the full signed-64-bit seed through JSON and JS.
@@ -228,6 +234,13 @@ func _validate_identity(report: ValidationReport) -> void:
 		report.add_error(&"schema.author_id_too_long", "Author ID is too long.", "author_id")
 	if str(theme).is_empty() or str(theme).to_utf8_buffer().size() > GameLimitsType.MAX_THEME_BYTES:
 		report.add_error(&"schema.theme_invalid", "Theme identifier is invalid.", "theme")
+	if str(road_surface).to_utf8_buffer().size() > GameLimitsType.MAX_ROAD_SURFACE_BYTES \
+			or not RoadSurfaceCatalogType.is_supported(road_surface):
+		report.add_error(
+			&"schema.road_surface_invalid",
+			"Road surface identifier is not supported.",
+			"road_surface"
+		)
 	if direction != DIRECTION_CLOCKWISE and direction != DIRECTION_COUNTER_CLOCKWISE:
 		report.add_error(&"schema.direction_invalid", "Direction must be clockwise or counter_clockwise.", "direction")
 	if pit_side != PIT_NONE and pit_side != PIT_LEFT and pit_side != PIT_RIGHT:
@@ -364,7 +377,7 @@ static func _collect_decode_errors(data: Dictionary) -> Array[Dictionary]:
 	var expected_keys := PackedStringArray([
 		"schema_version", "generator_version", "track_id", "track_name", "author_id",
 		"canvas_size", "control_points", "direction", "target_length", "track_width",
-		"theme", "pit_side", "decoration_density", "deterministic_seed",
+		"theme", "road_surface", "pit_side", "decoration_density", "deterministic_seed",
 		"bridge_crossings", "start_finish_distance", "content_hash",
 		"created_at_timestamp", "updated_at_timestamp",
 	])
@@ -374,7 +387,7 @@ static func _collect_decode_errors(data: Dictionary) -> Array[Dictionary]:
 	for key_variant in data.keys():
 		var key := str(key_variant)
 		if not expected_keys.has(key):
-			errors.append({"path": key, "message": "Unknown schema-v1 field."})
+			errors.append({"path": key, "message": "Unknown schema-v2 field."})
 	_expect_integral_number(data, "schema_version", errors)
 	_expect_integral_number(data, "generator_version", errors)
 	_expect_type(data, "track_id", [TYPE_STRING], errors)
@@ -382,6 +395,7 @@ static func _collect_decode_errors(data: Dictionary) -> Array[Dictionary]:
 	_expect_type(data, "author_id", [TYPE_STRING], errors)
 	_expect_type(data, "direction", [TYPE_STRING], errors)
 	_expect_type(data, "theme", [TYPE_STRING], errors)
+	_expect_type(data, "road_surface", [TYPE_STRING], errors)
 	_expect_type(data, "pit_side", [TYPE_STRING], errors)
 	_expect_type(data, "content_hash", [TYPE_STRING], errors)
 	_expect_seed(data, errors)

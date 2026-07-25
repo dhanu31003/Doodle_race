@@ -24,6 +24,16 @@ func _run() -> void:
 	test.assert_true(bool(fixture.get("valid", false)), "true-world fixture compiles a built-in circuit")
 	if bool(fixture.get("valid", false)):
 		await _test_true_world_contract(test, fixture["query"] as RaceTrackQuery)
+	var bridge_fixture := _compiled_query("builtin-nightfall-crossing")
+	test.assert_true(bool(bridge_fixture.get("valid", false)), "slope-alignment fixture compiles the bridge circuit")
+	if bool(bridge_fixture.get("valid", false)):
+		await _test_bridge_grade_alignment(
+			test, bridge_fixture["query"] as RaceTrackQuery
+		)
+	var mud_fixture := _compiled_query("builtin-riverbend")
+	test.assert_true(bool(mud_fixture.get("valid", false)), "surface fixture compiles the mud circuit")
+	if bool(mud_fixture.get("valid", false)):
+		await _test_surface_style_binding(test, mud_fixture["query"] as RaceTrackQuery)
 	await process_frame
 	var result: Dictionary = test.result("race_world_3d_integration")
 	if result.passed:
@@ -34,6 +44,130 @@ func _run() -> void:
 	for failure in result.failures:
 		print("  - %s" % failure)
 	quit(1)
+
+
+func _test_bridge_grade_alignment(test: RefCounted, query: RaceTrackQuery) -> void:
+	test.assert_true(not query.bridge_zones.is_empty(), "slope fixture exposes a bridge ramp")
+	if query.bridge_zones.is_empty():
+		return
+	var zone: Dictionary = query.bridge_zones[0]
+	var ramp_distance := float(zone["overpass_distance"]) \
+			- (float(zone["deck_half_length"]) + float(zone["ramp_half_length"])) * 0.5
+	var entry := RaceEntryType.new()
+	entry.participant_id = &"slope-player"
+	entry.display_name = "SLOPE PLAYER"
+	entry.is_human = true
+	entry.grid_position = 1
+	entry.state = _vehicle_state_at(query, ramp_distance, entry.participant_id)
+	entry.state.is_grounded = true
+	entry.previous_state = entry.state.duplicate_state()
+	var world := RaceWorldType.new()
+	world.size = Vector2(960.0, 540.0)
+	root.add_child(world)
+	await process_frame
+	world.configure_accessibility(true, false, false, 0.0)
+	world.configure(query, RaceWorldType.CAMERA_CHASE, Color("18d8a0"))
+	world.update_race(entry, [entry], RaceInputType.new(), 1.0)
+	await process_frame
+	var grounded_transform := world.debug_vehicle_transform(entry.participant_id)
+	var behind := query.sample_at_distance(
+		ramp_distance - RaceWorldType.VEHICLE_GRADE_PROBE_AUTHORITY_UNITS * 0.5
+	)
+	var ahead := query.sample_at_distance(
+		ramp_distance + RaceWorldType.VEHICLE_GRADE_PROBE_AUTHORITY_UNITS * 0.5
+	)
+	var behind_world := Mapper.authority_position_to_world(
+		behind["position"], float(behind["elevation_level"])
+	)
+	var ahead_world := Mapper.authority_position_to_world(
+		ahead["position"], float(ahead["elevation_level"])
+	)
+	var grade := ahead_world - behind_world
+	var expected_pitch := atan2(grade.y, Vector2(grade.x, grade.z).length())
+	test.assert_true(
+		absf(grounded_transform.basis.x.normalized().y) > 0.01,
+		"grounded Formula car visibly pitches with the bridge ramp instead of remaining flat"
+	)
+	test.assert_near(
+		grounded_transform.basis.x.normalized().y,
+		sin(expected_pitch), 0.002,
+		"grounded car forward axis matches the sampled road grade"
+	)
+	var road_center := Mapper.authority_position_to_world(
+		entry.state.position, entry.state.track_elevation,
+		Mapper.ROAD_SURFACE_Y_METERS
+	)
+	test.assert_true(
+		grounded_transform.origin.y > road_center.y + 0.03,
+		"sloped car root retains positive road-surface clearance"
+	)
+
+	entry.state = entry.state.duplicate_state()
+	entry.state.is_grounded = false
+	entry.state.vertical_offset_meters = 0.65
+	entry.state.vertical_velocity_mps = 0.0
+	entry.previous_state = entry.state.duplicate_state()
+	world.update_race(entry, [entry], RaceInputType.new(), 1.0)
+	var airborne_transform := world.debug_vehicle_transform(entry.participant_id)
+	test.assert_near(
+		airborne_transform.basis.x.normalized().y, 0.0, 0.0001,
+		"airborne car attitude is independent of the road grade beneath it"
+	)
+	test.assert_true(
+		airborne_transform.origin.y > grounded_transform.origin.y + 0.64,
+		"airborne presentation retains the authoritative natural flight clearance"
+	)
+	root.remove_child(world)
+	world.free()
+	await process_frame
+
+
+func _test_surface_style_binding(test: RefCounted, query: RaceTrackQuery) -> void:
+	test.assert_equal(str(query.road_surface), "mud", "surface fixture carries mud authority")
+	var entry := RaceEntryType.new()
+	entry.participant_id = &"surface-player"
+	entry.display_name = "SURFACE PLAYER"
+	entry.is_human = true
+	entry.grid_position = 1
+	entry.state = _vehicle_state_at(query, query.total_length * 0.15, entry.participant_id)
+	entry.state.velocity = Vector2(
+		query.sample_at_distance(entry.state.track_distance).get("tangent", Vector2.RIGHT)
+	) * 150.0
+	entry.state.is_grounded = true
+	entry.previous_state = entry.state.duplicate_state()
+	var world := RaceWorldType.new()
+	world.size = Vector2(960.0, 540.0)
+	root.add_child(world)
+	await process_frame
+	world.configure_accessibility(true, true, false, 0.0)
+	world.configure(query, RaceWorldType.CAMERA_CHASE, Color("18d8a0"))
+	world.update_race(entry, [entry], RaceInputType.new(0.0, 1.0, 0.0), 1.0)
+	await process_frame
+	var snapshot := world.debug_snapshot()
+	var effects: Dictionary = snapshot.get("road_surface_effects", {})
+	test.assert_equal(
+		str(snapshot.get("player_road_surface", "")), "mud",
+		"RaceWorld applies the authoritative mud style to the player car"
+	)
+	test.assert_true(
+		bool(snapshot.get("player_surface_coating_visible", false))
+				and int(snapshot.get("player_surface_coating_count", 0)) >= 10
+				and int(snapshot.get("player_surface_coating_visible_count", 0)) >= 1
+				and float(snapshot.get("player_surface_coating_opacity", 0.0)) > 0.40
+				and float(snapshot.get("player_mud_accumulation", 0.0)) > 0.0,
+		"mud visibly begins coating the player car during the opening sector"
+	)
+	test.assert_true(
+		str(effects.get("surface_style", "")) == "mud"
+				and int(effects.get("active_spray_count", 0)) == 1
+				and int(effects.get("spray_draw_passes", 0)) == 1
+				and int(effects.get("spray_particle_capacity", 999)) <= 48
+				and int(effects.get("static_detail_count", 999)) <= 20,
+		"mud configures one live low-capacity rear clod wake and bounded static detail"
+	)
+	root.remove_child(world)
+	world.free()
+	await process_frame
 
 
 func _test_true_world_contract(test: RefCounted, query: RaceTrackQuery) -> void:
@@ -236,8 +370,9 @@ func _test_true_world_contract(test: RefCounted, query: RaceTrackQuery) -> void:
 	test.assert_true(
 		float(mobile_track_stats.get("sample_step_authority", 0.0)) >= 9.99
 				and int(mobile_track_stats.get("segment_count", 9999)) <= 500
-				and int(mobile_track_stats.get("triangles", 999_999)) <= 6_000,
-		"long mobile circuit uses the coarser bounded mesh tier without dropping surfaces"
+				and int(mobile_track_stats.get("triangles", 999_999)) <= 6_000
+				and bool(mobile_track_stats.get("mobile_surface_budget", false)),
+		"long mobile circuit uses bounded geometry and the low-ALU surface shader tier"
 	)
 
 	var entries := _make_grid(query)
@@ -307,15 +442,26 @@ func _test_true_world_contract(test: RefCounted, query: RaceTrackQuery) -> void:
 	)
 	for _frame in 120:
 		world.update_race(player, entries, command, 1.0)
+	var steady_state := world.debug_snapshot()
 	test.assert_equal(
-		int(world.debug_snapshot().get("vehicle_render_budget_apply_count", -1)),
+		int(steady_state.get("vehicle_render_budget_apply_count", -1)),
 		render_budget_apply_count,
 		"steady-state race updates never rebuild or reallocate opponent LODs"
 	)
 	test.assert_equal(
-		int(world.debug_snapshot().get("static_world_rebuild_count", -1)),
+		int(steady_state.get("static_world_rebuild_count", -1)),
 		static_world_rebuild_count,
 		"steady-state race updates never rebuild track, terrain, or scenery"
+	)
+	test.assert_true(
+		int(steady_state.get("mobile_remote_animation_stride", 0)) == 2
+				and int(steady_state.get("remote_animation_update_count", 0)) > 0
+				and int(steady_state.get("remote_animation_skip_count", 0)) > 0
+				and abs(
+					int(steady_state.get("remote_animation_update_count", 0))
+							- int(steady_state.get("remote_animation_skip_count", 0))
+				) <= 1,
+		"mobile distributes opponent animation evenly while every transform remains live"
 	)
 	test.assert_equal(
 		int(populated.get("vehicle_world_transforms", {}).size()), CAR_COUNT,

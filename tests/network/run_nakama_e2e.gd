@@ -23,13 +23,14 @@ func _run() -> void:
 	get_root().add_child(guest_root)
 	var host := AdapterType.new()
 	var guest := AdapterType.new()
+	var nakama_port := _nakama_port()
 
 	var host_auth: Dictionary = await host.authenticate_device_async(
-		host_root, "raceglyph-e2e-host-device-0001", "E2E Host", "127.0.0.1", 7350,
+		host_root, "raceglyph-e2e-host-device-0001", "E2E Host", "127.0.0.1", nakama_port,
 		"CHANGE_ME_LOCAL_SERVER_KEY_32_CHARS"
 	)
 	var guest_auth: Dictionary = await guest.authenticate_device_async(
-		guest_root, "raceglyph-e2e-guest-device-0002", "E2E Guest", "127.0.0.1", 7350,
+		guest_root, "raceglyph-e2e-guest-device-0002", "E2E Guest", "127.0.0.1", nakama_port,
 		"CHANGE_ME_LOCAL_SERVER_KEY_32_CHARS"
 	)
 	_test.assert_true(host_auth["ok"], "official SDK must device-authenticate host")
@@ -88,7 +89,7 @@ func _run() -> void:
 	var track_fixture: Dictionary = fixture_builder.call("build") if fixture_builder != null else {}
 	fixture_builder = null
 	var manifest: Dictionary = track_fixture.get("manifest", {})
-	_test.assert_true(bool(track_fixture.get("ok", false)), "generator-v2 track must compile for real network test")
+	_test.assert_true(bool(track_fixture.get("ok", false)), "generator-v3 track must compile for real network test")
 	if not bool(track_fixture.get("ok", false)):
 		await _finish(host, guest, host_root, guest_root)
 		return
@@ -495,6 +496,15 @@ func _finish(host: RefCounted, guest: RefCounted, host_root: Node, guest_root: N
 	var exit_code := 0 if result["passed"] else 1
 	_test = null
 	call_deferred("_quit_after_cleanup", exit_code)
+
+
+func _nakama_port() -> int:
+	var raw := OS.get_environment("RACEGLYPH_TEST_NAKAMA_PORT").strip_edges()
+	if raw.is_valid_int():
+		var port := int(raw)
+		if port >= 1024 and port <= 65535:
+			return port
+	return 7350
 
 
 func _quit_after_cleanup(exit_code: int) -> void:

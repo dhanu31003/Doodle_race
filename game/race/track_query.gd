@@ -11,6 +11,7 @@ const TrackDefinitionType := preload("res://game/track/definition/track_definiti
 const BridgeDefinitionType := preload("res://game/track/definition/bridge_crossing_definition.gd")
 const BridgePlannerType := preload("res://game/track/features/bridge_plan_builder.gd")
 const TrackValidatorType := preload("res://game/track/validation/track_validator.gd")
+const RoadSurfaceCatalogType := preload("res://game/content/road_surface_catalog.gd")
 
 const MAX_SAMPLES: int = 8192
 const MIN_WIDTH: float = 1.0
@@ -24,6 +25,8 @@ var radii: PackedFloat64Array = PackedFloat64Array()
 var corner_sections: Array[Dictionary] = []
 var straight_sections: Array[Dictionary] = []
 var bridge_zones: Array[Dictionary] = []
+var road_surface: StringName = RoadSurfaceCatalogType.SMOOTH_ASPHALT
+var deterministic_seed: int = 0
 var track_width: float = 0.0
 var total_length: float = 0.0
 var error: StringName = &"not_configured"
@@ -54,6 +57,10 @@ static func from_compiled(compiled: Variant) -> RaceTrackQuery:
 	)
 	if not query.is_valid() or not compiled is CompiledTrack:
 		return query
+	query.road_surface = RoadSurfaceCatalogType.sanitized_style(
+		StringName(str(_property_value(compiled, &"road_surface")))
+	)
+	query.deterministic_seed = int(_property_value(compiled, &"deterministic_seed"))
 	var runtime_bridge_plan := query._derive_runtime_bridge_plan(compiled)
 	if not bool(runtime_bridge_plan.get("valid", false)):
 		query.error = StringName(str(runtime_bridge_plan.get("error", "invalid_bridge_plan")))
@@ -78,6 +85,8 @@ func configure(
 	corner_sections = []
 	straight_sections = []
 	bridge_zones = []
+	road_surface = RoadSurfaceCatalogType.SMOOTH_ASPHALT
+	deterministic_seed = 0
 	_segment_starts = PackedFloat64Array()
 	_segment_lengths = PackedFloat64Array()
 	total_length = 0.0
@@ -117,6 +126,16 @@ func configure(
 	corner_sections = _sanitized_sections(source_corners)
 	straight_sections = _sanitized_sections(source_straights)
 	return true
+
+
+func surface_profile() -> Dictionary:
+	return RoadSurfaceCatalogType.profile(road_surface)
+
+
+func surface_bump_height_meters(distance_along: float) -> float:
+	return RoadSurfaceCatalogType.bump_height_meters(
+		road_surface, distance_along, total_length, deterministic_seed
+	)
 
 
 func configure_bridge_plan(plan: Dictionary) -> bool:
@@ -585,6 +604,8 @@ func _reset_invalid() -> void:
 	corner_sections = []
 	straight_sections = []
 	bridge_zones = []
+	road_surface = RoadSurfaceCatalogType.SMOOTH_ASPHALT
+	deterministic_seed = 0
 	_segment_starts = PackedFloat64Array()
 	_segment_lengths = PackedFloat64Array()
 	total_length = 0.0

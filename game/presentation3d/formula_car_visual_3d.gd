@@ -11,6 +11,7 @@ extends Node3D
 
 const BASE_MODEL_PATH: String = "res://assets/final/3d/vehicles/formula_car_premium_original.glb"
 const BASE_MODEL_SCENE: PackedScene = preload(BASE_MODEL_PATH)
+const RoadSurfaceCatalogType := preload("res://game/content/road_surface_catalog.gd")
 const AUTHORITY_UNIT_TO_METERS: float = 0.30
 const FRONT_WHEEL_RADIUS: float = 0.355
 const REAR_WHEEL_RADIUS: float = 0.385
@@ -31,6 +32,9 @@ const PLAYER_YOKE_HEIGHT_METERS: float = 0.86
 const COCKPIT_HAND_CLEARANCE_FLOOR_METERS: float = 0.565
 const REMOTE_DETAIL_RANGE_METERS: float = 78.0
 const MOBILE_REMOTE_DETAIL_RANGE_METERS: float = 42.0
+const PLAYER_MUD_STAGES: int = 10
+const REMOTE_MUD_STAGES: int = 6
+const MOBILE_REMOTE_MUD_STAGES: int = 3
 
 static var _remote_body_mesh_cache: ArrayMesh
 static var _remote_wheel_mesh_cache: ArrayMesh
@@ -49,6 +53,8 @@ var _steering_wheel_pivot: Node3D
 var _dashboard_label: Label3D
 var _rain_light: MeshInstance3D
 var _rain_light_material: StandardMaterial3D
+var _surface_coating: MultiMeshInstance3D
+var _surface_coating_material: StandardMaterial3D
 var _body_material: StandardMaterial3D
 var _accent_material: StandardMaterial3D
 var _secondary_material: StandardMaterial3D
@@ -80,6 +86,7 @@ var _remote_wheel_instances: MultiMeshInstance3D
 var _remote_wheel_multimesh: MultiMesh
 var _remote_wheel_scales: Array[Vector3] = []
 var _remote_carbon_bar_specs: Array = []
+var _cockpit_halo_guard: MultiMeshInstance3D
 var _hand_roots: Array[Node3D] = []
 var _driver_sleeves: Array[MeshInstance3D] = []
 var _cockpit_detail_nodes: Array[Node3D] = []
@@ -96,6 +103,15 @@ var _rain_phase: float = 0.0
 var _last_gear: int = 1
 var _last_rpm: float = IDLE_RPM
 var _last_shifting: bool = false
+var _surface_style: StringName = RoadSurfaceCatalogType.SMOOTH_ASPHALT
+var _surface_coating_count := 0
+var _surface_lap_progress := 0.0
+var _mud_accumulation := 0.0
+var _surface_appearance_step := -1
+var _surface_appearance_apply_count := 0
+var _rain_light_active := false
+var _rain_light_initialized := false
+var _rain_light_material_update_count := 0
 var _built: bool = false
 # A directly-instantiated review/player car keeps the premium cockpit. RaceWorld
 # calls configure() before add_child(), so remote roles replace this default
@@ -133,9 +149,51 @@ func configure(
 	set_team_color(color, accent_color)
 	if not _is_player:
 		configure_remote_render_budget(_remote_mobile_budget)
+	_apply_surface_appearance()
 
 
-func apply_vehicle_state(state: Variant, command: Variant = null, delta: float = 0.016) -> void:
+func configure_surface(style: StringName) -> void:
+	var next_style := RoadSurfaceCatalogType.sanitized_style(style)
+	if next_style != _surface_style:
+		_surface_lap_progress = 0.0
+		_mud_accumulation = 0.0
+		_surface_appearance_step = -1
+	_surface_style = next_style
+	if not _built:
+		_ready()
+	_apply_surface_appearance()
+
+
+func set_surface_lap_progress(progress: float) -> void:
+	## Dirt is driven by validated race progress and changes only at a small
+	## number of stages. This keeps the car visibly evolving without invalidating
+	## materials every rendered frame when the complete field is on Mud.
+	if _surface_style != RoadSurfaceCatalogType.MUD:
+		return
+	var safe_progress := clampf(progress, 0.0, 1.0) \
+			if not is_nan(progress) and not is_inf(progress) else 0.0
+	var step_count := PLAYER_MUD_STAGES if _is_player else REMOTE_MUD_STAGES
+	if not _is_player and _remote_mobile_budget:
+		step_count = MOBILE_REMOTE_MUD_STAGES
+	var next_step := clampi(
+		floori(safe_progress * float(step_count) + 0.0001), 0, step_count
+	)
+	if next_step == _surface_appearance_step:
+		return
+	_surface_appearance_step = next_step
+	_surface_lap_progress = float(next_step) / float(step_count)
+	# The coating becomes readable within the opening sector and reaches its
+	# full brown finish before the lap ends, while the grid still starts clean.
+	_mud_accumulation = smoothstep(0.02, 0.70, _surface_lap_progress)
+	_apply_surface_appearance()
+
+
+func apply_vehicle_state(
+		state: Variant,
+		command: Variant = null,
+		delta: float = 0.016,
+		surface_bump_meters: float = 0.0
+	) -> void:
 	if not _built:
 		_ready()
 	var safe_delta := _finite_clamped(delta, 0.0, 0.1, 0.0)
@@ -159,6 +217,9 @@ func apply_vehicle_state(state: Variant, command: Variant = null, delta: float =
 	var gear := clampi(_int_value(state, &"gear", 1), -1, 8)
 	var shifting := _int_value(state, &"shift_ticks_remaining", 0) > 0
 	var speed_mps := _speed_meters_per_second(state)
+	var surface_bump := _finite_clamped(
+		surface_bump_meters, -MAX_SUSPENSION_TRAVEL_METERS, MAX_SUSPENSION_TRAVEL_METERS, 0.0
+	)
 	var blend := 1.0 if safe_delta <= 0.0 else 1.0 - exp(-safe_delta * 13.0)
 
 	_visual_steering = lerpf(_visual_steering, steering, blend)
@@ -194,7 +255,8 @@ func apply_vehicle_state(state: Variant, command: Variant = null, delta: float =
 		MAX_BODY_PITCH_RADIANS
 	)
 	var target_heave := clampf(
-		-brake * 0.030 - minf(speed_mps / 95.0, 1.0) * 0.010 + throttle * 0.006,
+		-brake * 0.030 - minf(speed_mps / 95.0, 1.0) * 0.010 \
+				+ throttle * 0.006 + surface_bump * 0.72,
 		-MAX_BODY_HEAVE_METERS,
 		MAX_BODY_HEAVE_METERS
 	)
@@ -208,7 +270,7 @@ func apply_vehicle_state(state: Variant, command: Variant = null, delta: float =
 	_body_root.rotation.z = clampf(
 		_visual_pitch, -MAX_BODY_PITCH_RADIANS, MAX_BODY_PITCH_RADIANS
 	)
-	_update_suspension(brake, throttle, wheel_slip)
+	_update_suspension(brake, throttle, wheel_slip, surface_bump)
 	if _cockpit_detail_visible:
 		_update_driver_sleeves()
 	_sync_remote_wheel_instances()
@@ -229,6 +291,7 @@ func set_team_color(color: Color, new_accent: Color = Color("f1f7f5")) -> void:
 		_accent_material.albedo_color = accent_color
 	# Material lanes on the original body are routed once during construction;
 	# updating their shared materials recolours the complete fictional livery.
+	_apply_surface_appearance()
 
 
 func set_color(color: Color) -> void:
@@ -349,6 +412,27 @@ func presentation_snapshot() -> Dictionary:
 			_rain_light_material.emission_energy_multiplier
 			if _rain_light_material != null else 0.0
 		),
+		"road_surface": str(_surface_style),
+		"surface_coating_visible": (
+			_surface_coating != null and _surface_coating.visible
+		),
+		"surface_coating_node_present": _surface_coating != null,
+		"surface_coating_count": _surface_coating_count,
+		"surface_coating_visible_count": (
+			_surface_coating.multimesh.visible_instance_count
+			if _surface_coating != null and _surface_coating.multimesh != null else 0
+		),
+		"surface_coating_opacity": (
+			_surface_coating_material.albedo_color.a
+			if _surface_coating_material != null else 0.0
+		),
+		"surface_lap_progress": _surface_lap_progress,
+		"mud_accumulation": _mud_accumulation,
+		"surface_appearance_apply_count": _surface_appearance_apply_count,
+		"rain_light_material_update_count": _rain_light_material_update_count,
+		"body_roughness": _body_material.roughness if _body_material != null else 0.0,
+		"body_surface_color": _body_material.albedo_color \
+				if _body_material != null else Color.WHITE,
 		"team_color": team_color,
 		"cockpit_socket": cockpit_camera_socket != null,
 		"chase_socket": chase_camera_socket != null,
@@ -367,6 +451,9 @@ func presentation_snapshot() -> Dictionary:
 		"cockpit_detail_count": _cockpit_detail_count,
 		"visible_cockpit_detail_count": _visible_cockpit_detail_count(),
 		"cockpit_detail_visible": _cockpit_detail_visible,
+		"cockpit_halo_guard_visible": _cockpit_halo_guard != null \
+				and is_instance_valid(_cockpit_halo_guard) \
+				and _cockpit_halo_guard.visible,
 		"cockpit_visibility_apply_count": _cockpit_visibility_apply_count,
 		"cockpit_wet_fx_count": 0,
 		"lod_tier": "player_cockpit" if _is_player else "remote_exterior",
@@ -433,6 +520,7 @@ func _build_visual() -> void:
 	_build_wheels_and_suspension()
 	_build_steering_wheel_and_driver()
 	_build_lights()
+	_build_surface_coating()
 	_build_camera_sockets()
 
 
@@ -636,22 +724,33 @@ func _build_aero() -> void:
 
 
 func _build_halo_and_cockpit() -> void:
-	var halo_specs: Array = [
+	# The forward halo is essential in the driver's view, but from the elevated
+	# chase camera its three upper bars read as a large floating triangle. Keep
+	# those guards in the cockpit-only visibility set for the player. The lower
+	# cockpit rails remain part of the exterior silhouette in both cameras, and
+	# remote cars retain the complete safety-cell outline.
+	var halo_guard_specs: Array = [
 		[Vector3(0.72, 0.66, 0.0), Vector3(0.72, 1.38, 0.0), 0.013],
 		[Vector3(0.72, 1.38, -0.020), Vector3(-0.54, 1.34, -0.36), 0.014],
 		[Vector3(0.72, 1.38, 0.020), Vector3(-0.54, 1.34, 0.36), 0.014],
 		[Vector3(-0.54, 1.34, -0.36), Vector3(-0.54, 1.34, 0.36), 0.015],
+	]
+	var cockpit_rail_specs: Array = [
 		[Vector3(0.28, 0.74, -0.34), Vector3(-0.62, 0.73, -0.35), 0.034],
 		[Vector3(0.28, 0.74, 0.34), Vector3(-0.62, 0.73, 0.35), 0.034],
 	]
 	if _is_player:
+		_cockpit_halo_guard = _add_bar_multimesh(
+			_body_root, "CockpitOnlyHaloGuard", halo_guard_specs, _carbon_material
+		)
+		_register_cockpit_detail(_cockpit_halo_guard)
 		_add_bar_multimesh(
-			_body_root, "HaloAndCockpitRails", halo_specs, _carbon_material
+			_body_root, "ExteriorCockpitRails", cockpit_rail_specs, _carbon_material
 		)
 	else:
 		# Remote halo and suspension share one carbon MultiMesh draw, assembled
 		# after the wheel pivots have been authored.
-		_remote_carbon_bar_specs = halo_specs
+		_remote_carbon_bar_specs = halo_guard_specs + cockpit_rail_specs
 	if not _is_player:
 		# Remote chase cameras only read the exterior survival-cell silhouette.
 		# Premium interior panels, vents, trim and bolsters are player-only.
@@ -1321,6 +1420,126 @@ func _build_lights() -> void:
 	_body_root.add_child(_rain_light)
 
 
+func _build_surface_coating() -> void:
+	# A single instanced draw gives mud/gravel/broken-asphalt races a visible car
+	# response without cloning decals or particle nodes for every opponent.
+	_surface_coating_material = _material(Color(0.12, 0.09, 0.065, 0.82), 0.0, 1.0)
+	_surface_coating_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	# Mobile opponents express dirt through their already-required body/wheel
+	# materials. Do not add an unused GeometryInstance to every remote graph.
+	if not _is_player and _remote_mobile_budget:
+		_surface_coating_count = 0
+		return
+	var speck := SphereMesh.new()
+	speck.radius = 0.042
+	speck.height = 0.070
+	# The brown body tint carries the coating at racing distance. These low-poly
+	# clumps add silhouette breakup without multiplying fine geometry across cars.
+	speck.radial_segments = 8 if _is_player else 6
+	speck.rings = 4 if _is_player else 3
+	speck.material = _surface_coating_material
+	var placements := [
+		Transform3D(Basis.from_scale(Vector3(1.8, 0.45, 1.0)), Vector3(-0.40, 0.44, -0.62)),
+		Transform3D(Basis.from_scale(Vector3(1.3, 0.34, 0.8)), Vector3(-0.82, 0.36, 0.66)),
+		Transform3D(Basis.from_scale(Vector3(1.1, 0.28, 0.9)), Vector3(0.22, 0.40, 0.58)),
+		Transform3D(Basis.from_scale(Vector3(1.5, 0.30, 0.7)), Vector3(0.55, 0.30, -0.44)),
+		Transform3D(Basis.from_scale(Vector3(1.0, 0.32, 0.8)), Vector3(-1.30, 0.47, -0.55)),
+		Transform3D(Basis.from_scale(Vector3(1.6, 0.30, 0.6)), Vector3(-1.58, 0.82, 0.46)),
+		Transform3D(Basis.from_scale(Vector3(1.0, 0.25, 0.7)), Vector3(1.05, 0.31, 0.29)),
+		Transform3D(Basis.from_scale(Vector3(1.3, 0.24, 0.6)), Vector3(1.42, 0.27, -0.24)),
+		Transform3D(Basis.from_scale(Vector3(0.9, 0.23, 0.8)), Vector3(-0.12, 0.57, -0.47)),
+		Transform3D(Basis.from_scale(Vector3(1.2, 0.22, 0.6)), Vector3(-1.74, 0.91, -0.30)),
+	]
+	var count := placements.size() if _is_player else 6
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.mesh = speck
+	multimesh.instance_count = count
+	for index in count:
+		multimesh.set_instance_transform(index, placements[index])
+	_surface_coating = MultiMeshInstance3D.new()
+	_surface_coating.name = "SurfaceDirtCoating"
+	_surface_coating.multimesh = multimesh
+	_surface_coating.multimesh.visible_instance_count = 0
+	_surface_coating.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_surface_coating.visible = false
+	_body_root.add_child(_surface_coating)
+	_surface_coating_count = count
+
+
+func _apply_surface_appearance() -> void:
+	if _body_material == null or _accent_material == null \
+			or _surface_coating_material == null:
+		return
+	_surface_appearance_apply_count += 1
+	if _surface_coating != null:
+		_surface_coating.visible = false
+		_surface_coating.multimesh.visible_instance_count = 0
+	_body_material.albedo_color = team_color
+	_accent_material.albedo_color = accent_color
+	_rim_material.albedo_color = Color("2d333b")
+	_remote_wheel_material.albedo_color = Color("15191e")
+	_body_material.roughness = 0.16
+	_body_material.clearcoat_roughness = 0.12
+	_accent_material.roughness = 0.17
+	_rubber_material.roughness = 0.82
+	match _surface_style:
+		RoadSurfaceCatalogType.WEATHERED_ASPHALT:
+			# A tight clearcoat highlight reads as a rain-wet body at racing scale.
+			_body_material.albedo_color = team_color.darkened(0.06)
+			_body_material.roughness = 0.075
+			_body_material.clearcoat_roughness = 0.035
+			_accent_material.roughness = 0.09
+		RoadSurfaceCatalogType.BUMPY_ASPHALT:
+			if _surface_coating != null:
+				_surface_coating.visible = true
+				_surface_coating.multimesh.visible_instance_count = _surface_coating_count
+			_surface_coating_material.albedo_color = Color(0.08, 0.085, 0.085, 0.48)
+			_body_material.albedo_color = team_color.lerp(Color("3b3d3d"), 0.12)
+			_body_material.roughness = 0.30
+		RoadSurfaceCatalogType.COMPACT_GRAVEL:
+			if _surface_coating != null:
+				_surface_coating.visible = true
+				_surface_coating.multimesh.visible_instance_count = _surface_coating_count
+			_surface_coating_material.albedo_color = Color(0.43, 0.34, 0.22, 0.50)
+			_body_material.albedo_color = team_color.lerp(Color("8a724d"), 0.24)
+			_accent_material.albedo_color = accent_color.lerp(Color("a58b60"), 0.18)
+			_body_material.roughness = 0.43
+			_accent_material.roughness = 0.38
+			_rubber_material.roughness = 0.96
+		RoadSurfaceCatalogType.MUD:
+			var dirt := clampf(_mud_accumulation, 0.0, 1.0)
+			var visible_specks := clampi(
+				ceili(dirt * float(_surface_coating_count)), 0, _surface_coating_count
+			)
+			# One alpha-zero player speck prewarms the transparent coating pipeline
+			# during race setup, preventing a first-dirt shader hitch. Mobile remotes
+			# receive the obvious brown tint but no repeated splatter draw.
+			if _surface_coating != null:
+				var prewarm_count := 1 \
+						if _is_player and visible_specks == 0 else visible_specks
+				_surface_coating.multimesh.visible_instance_count = prewarm_count
+				_surface_coating.visible = _is_player or not _remote_mobile_budget
+			_surface_coating_material.albedo_color = Color(
+				0.12, 0.070, 0.032, 0.0 if dirt <= 0.001 else lerpf(0.42, 0.92, dirt)
+			)
+			_body_material.albedo_color = team_color.lerp(
+				Color("4a2d18"), dirt * 0.74
+			)
+			_accent_material.albedo_color = accent_color.lerp(
+				Color("5b3920"), dirt * 0.64
+			)
+			_rim_material.albedo_color = Color("2d333b").lerp(
+				Color("3a2718"), dirt * 0.78
+			)
+			_remote_wheel_material.albedo_color = Color("15191e").lerp(
+				Color("302116"), dirt * 0.72
+			)
+			_body_material.roughness = lerpf(0.16, 0.72, dirt)
+			_accent_material.roughness = lerpf(0.17, 0.64, dirt)
+			_rubber_material.roughness = lerpf(0.82, 1.0, dirt)
+
+
 func _build_camera_sockets() -> void:
 	# Camera mounts follow the authoritative vehicle transform, but not the
 	# presentation-only suspension root. This lets the body pitch/heave under
@@ -1337,7 +1556,12 @@ func _build_camera_sockets() -> void:
 	add_child(chase_camera_socket)
 
 
-func _update_suspension(brake: float, throttle: float, wheel_slip: float) -> void:
+func _update_suspension(
+		brake: float,
+		throttle: float,
+		wheel_slip: float,
+		surface_bump: float = 0.0
+	) -> void:
 	for index in _wheel_suspension_pivots.size():
 		var pivot := _wheel_suspension_pivots[index]
 		var base := _wheel_base_positions[index]
@@ -1348,6 +1572,7 @@ func _update_suspension(brake: float, throttle: float, wheel_slip: float) -> voi
 			+ throttle * 0.010 * front_factor
 			+ _visual_roll * 0.30 * side_factor
 			+ minf(wheel_slip, 1.0) * sin(_wheel_spin_angle + float(index)) * 0.008
+			- surface_bump * 0.35
 		)
 		pivot.position.y = base.y + clampf(
 			compression, -MAX_SUSPENSION_TRAVEL_METERS, MAX_SUSPENSION_TRAVEL_METERS
@@ -1369,8 +1594,20 @@ func _update_dashboard(gear: int, rpm: float, shifting: bool) -> void:
 
 func _update_rain_light(brake: float, wheel_slip: float, delta: float) -> void:
 	_rain_phase = fposmod(_rain_phase + delta, 0.50)
-	var pulse := _rain_phase < 0.115 or (_rain_phase > 0.20 and _rain_phase < 0.30)
-	var active := brake > 0.18 or wheel_slip > 0.32 or pulse
+	# Do not synchronize cosmetic pulse writes across eleven mobile opponents.
+	# Real braking/slip still illuminates them; the player's lamp keeps the pulse.
+	var pulse := (_rain_phase < 0.115 or (_rain_phase > 0.20 and _rain_phase < 0.30)) \
+			and (_is_player or not _remote_mobile_budget)
+	var wet_surface := _surface_style in [
+		RoadSurfaceCatalogType.WEATHERED_ASPHALT,
+		RoadSurfaceCatalogType.MUD,
+	]
+	var active := brake > 0.18 or (wet_surface and (wheel_slip > 0.18 or pulse))
+	if _rain_light_initialized and active == _rain_light_active:
+		return
+	_rain_light_initialized = true
+	_rain_light_active = active
+	_rain_light_material_update_count += 1
 	_rain_light_material.emission_energy_multiplier = 7.5 if active else 0.04
 	_rain_light_material.albedo_color = Color("ff2942") if active else Color("36070d")
 

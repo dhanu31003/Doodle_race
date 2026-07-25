@@ -2,6 +2,8 @@ extends RefCounted
 
 const TestCaseType := preload("res://tests/support/test_case.gd")
 const TrackDefinitionType := preload("res://game/track/definition/track_definition.gd")
+const GameLimitsType := preload("res://game/config/game_limits.gd")
+const RoadSurfaceCatalogType := preload("res://game/content/road_surface_catalog.gd")
 
 const V1_FIXTURE := "res://tests/fixtures/tracks/stadium_v1.json"
 const V0_FIXTURE := "res://tests/fixtures/tracks/legacy_v0.json"
@@ -9,23 +11,26 @@ const V0_FIXTURE := "res://tests/fixtures/tracks/legacy_v0.json"
 
 func run() -> Dictionary:
 	var test := TestCaseType.new()
-	_test_v1_round_trip_and_hash(test)
+	_test_v1_migration_round_trip_and_hash(test)
 	_test_v0_migration(test)
 	_test_strict_validation(test)
 	return test.result("track_definition")
 
 
-func _test_v1_round_trip_and_hash(test: RefCounted) -> void:
+func _test_v1_migration_round_trip_and_hash(test: RefCounted) -> void:
 	var definition := TrackDefinitionType.from_json(_read(V1_FIXTURE))
-	test.assert_true(definition.validate_schema().is_valid(), "golden v1 fixture must validate")
+	test.assert_true(definition.validate_schema().is_valid(), "golden v1 fixture must migrate and validate")
+	test.assert_equal(definition.schema_version, GameLimitsType.TRACK_SCHEMA_VERSION, "v1 fixture migrates to the current schema")
+	test.assert_equal(definition.generator_version, GameLimitsType.TRACK_COMPILER_VERSION, "v1 fixture opts into current compiler authority")
+	test.assert_equal(definition.road_surface, RoadSurfaceCatalogType.SMOOTH_ASPHALT, "v1 fixture preserves legacy clean-asphalt behavior")
 	var canonical := definition.canonical_json(false)
 	var reparsed := TrackDefinitionType.from_json(canonical)
 	test.assert_equal(reparsed.canonical_json(false), canonical, "canonical definition must round-trip byte-for-byte")
 	test.assert_equal(reparsed.calculated_content_hash(), definition.calculated_content_hash(), "content hash must survive round trip")
 	test.assert_equal(
 		definition.calculated_content_hash(),
-		"c53133531cf19b19b8b1e9daf687ad919c13a161396c7698fa26788734a4ea8f",
-		"canonical v1 fixture SHA-256 must remain a golden contract"
+		"cc842c24acac5ee671d96008d351ef0a283134bc5e8c9718f917553739acfe66",
+		"migrated schema-v2 fixture SHA-256 remains a golden contract"
 	)
 	definition.refresh_content_hash()
 	test.assert_true(definition.validate_schema().is_valid(), "refreshed stored hash must validate")
@@ -33,12 +38,13 @@ func _test_v1_round_trip_and_hash(test: RefCounted) -> void:
 
 func _test_v0_migration(test: RefCounted) -> void:
 	var migrated := TrackDefinitionType.from_json(_read(V0_FIXTURE))
-	test.assert_equal(migrated.schema_version, 1, "legacy definition must migrate to schema v1")
+	test.assert_equal(migrated.schema_version, GameLimitsType.TRACK_SCHEMA_VERSION, "legacy definition must migrate to the current schema")
 	test.assert_equal(migrated.track_name, "Legacy Stadium", "legacy name must migrate")
 	test.assert_equal(migrated.deterministic_seed, 424242, "legacy seed must migrate")
 	test.assert_true(migrated.track_id.begins_with("migrated-"), "migration ID must be deterministic")
 	test.assert_near(migrated.control_points[0].x, 0.35, 0.000001, "legacy pixel points must normalize against canvas")
-	test.assert_true(migrated.validate_schema().is_valid(), "migrated fixture must satisfy v1 validation")
+	test.assert_equal(migrated.road_surface, RoadSurfaceCatalogType.SMOOTH_ASPHALT, "legacy migration defaults to smooth asphalt")
+	test.assert_true(migrated.validate_schema().is_valid(), "migrated fixture must satisfy current validation")
 	var migrated_again := TrackDefinitionType.from_dictionary(migrated.to_dictionary())
 	test.assert_equal(migrated_again.canonical_json(true), migrated.canonical_json(true), "migration must be idempotent")
 
@@ -49,6 +55,10 @@ func _test_strict_validation(test: RefCounted) -> void:
 	var report := definition.validate_schema()
 	test.assert_false(report.is_valid(), "out-of-range normalized point must fail")
 	test.assert_true(report.has_code(&"schema.point_out_of_bounds"), "point bounds issue code")
+	definition = TrackDefinitionType.from_json(_read(V1_FIXTURE))
+	definition.road_surface = &"lava"
+	definition.content_hash = ""
+	test.assert_true(definition.validate_schema().has_code(&"schema.road_surface_invalid"), "unknown road surfaces fail deterministic schema validation")
 	definition = TrackDefinitionType.from_json(_read(V1_FIXTURE))
 	definition.content_hash = "bad"
 	test.assert_true(definition.validate_schema().has_code(&"schema.content_hash_mismatch"), "stale content hash must fail")

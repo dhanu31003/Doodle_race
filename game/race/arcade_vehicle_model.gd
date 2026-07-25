@@ -20,13 +20,14 @@ const FORWARD_GEAR_COUNT: int = VehicleConfigType.FORWARD_GEAR_COUNT
 const WORLD_UNIT_TO_METERS: float = 0.30
 const STANDARD_GRAVITY: float = 9.80665
 const BRIDGE_HEIGHT_METERS: float = 6.0
-# Crest airtime is deliberately a short release of the suspension/downforce
-# constraint, not a jump-boost mechanic. The speed gate is 115.2 km/h and the
-# launch is capped so the ballistic arc normally lands on the same flat deck.
+# Crest airtime releases the suspension/downforce constraint at a genuine ramp
+# crest. Launch velocity follows the physical ramp grade, with a conservative
+# Formula-car transfer factor and safety cap; gravity remains standard Earth
+# gravity throughout the complete arc.
 const MIN_CREST_LAUNCH_SPEED_MPS: float = 32.0
-const MIN_CREST_LAUNCH_VERTICAL_SPEED_MPS: float = 0.75
-const MAX_CREST_LAUNCH_VERTICAL_SPEED_MPS: float = 3.2
-const CREST_DECK_RUNWAY_FRACTION: float = 0.82
+const MIN_CREST_LAUNCH_VERTICAL_SPEED_MPS: float = 1.0
+const MAX_CREST_LAUNCH_VERTICAL_SPEED_MPS: float = 4.6
+const CREST_LAUNCH_GRADE_TRANSFER: float = 0.30
 const CREST_ELEVATION_EPSILON: float = 0.0002
 const LANDING_EPSILON_METERS: float = 0.001
 
@@ -101,6 +102,8 @@ func step(
 		return false
 	var road_limit := maxf(0.1, track.track_width * 0.5 - config.vehicle_radius)
 	state.is_offtrack = absf(float(before["signed_lateral"])) > road_limit
+	var surface_profile := track.surface_profile()
+	var tyre_contact := state.is_grounded
 	_update_nitro(state, safe_command, delta)
 
 	var forward := state.forward()
@@ -112,13 +115,17 @@ func step(
 	var engine_factor := config.offtrack_engine_factor if state.is_offtrack else 1.0
 	var longitudinal_acceleration := 0.0
 	state.wheel_slip = 0.0
-	if safe_command.brake > 0.0:
+	if safe_command.brake > 0.0 and tyre_contact:
 		if longitudinal_speed > REVERSE_ENGAGE_SPEED:
 			# Carbon-brake strength rises with aerodynamic load. The bounded move
 			# toward zero is the ABS/accessibility layer: a fixed tick cannot lock
 			# the wheels and numerically overshoot straight into reverse.
-			var brake_capacity := config.brake_deceleration \
+			var brake_capacity := (
+				config.brake_deceleration
 				+ config.brake_downforce_coefficient * longitudinal_speed * longitudinal_speed
+			) * _surface_multiplier(
+				surface_profile, "braking_multiplier", state.is_offtrack, 1.0
+			)
 			longitudinal_speed = move_toward(
 				longitudinal_speed, 0.0,
 				safe_command.brake * brake_capacity * delta
@@ -127,34 +134,45 @@ func step(
 			# The conventional brake pedal engages reverse only after forward
 			# motion has settled. Reverse is deliberately single-speed and tame.
 			longitudinal_acceleration -= safe_command.brake * config.reverse_acceleration
-	elif safe_command.throttle > 0.0:
+	elif safe_command.throttle > 0.0 and tyre_contact:
 		var requested_drive := _requested_drive_acceleration(
 			state, safe_command.throttle
-		) * engine_factor
+		) * engine_factor * _surface_multiplier(
+			surface_profile, "drive_efficiency_multiplier", state.is_offtrack, 1.0
+		)
 		var traction_capacity := config.launch_traction_acceleration \
 			+ config.downforce_traction_coefficient * longitudinal_speed * longitudinal_speed
 		if state.is_offtrack:
 			traction_capacity *= config.offtrack_traction_factor
+		else:
+			traction_capacity *= float(surface_profile["traction_multiplier"])
 		state.wheel_slip = maxf(
 			0.0,
 			(requested_drive - traction_capacity) / maxf(traction_capacity, 1.0)
 		)
 		longitudinal_acceleration += minf(requested_drive, traction_capacity)
-	else:
+	elif tyre_contact:
 		var rolling_and_engine_brake := config.coast_deceleration
 		if state.gear > 0 and longitudinal_speed > 0.0:
 			rolling_and_engine_brake += config.engine_brake_deceleration * _engine_brake_factor(state)
 		longitudinal_speed = move_toward(
 			longitudinal_speed, 0.0, rolling_and_engine_brake * delta
 		)
-	if state.nitro_active:
+	if state.nitro_active and tyre_contact:
 		longitudinal_acceleration += config.nitro_acceleration * engine_factor
 	# Quadratic drag always opposes travel, including reverse.
 	longitudinal_acceleration -= (
 		config.aerodynamic_drag * longitudinal_speed * absf(longitudinal_speed)
 	)
+	if tyre_contact and not state.is_offtrack:
+		# Loose/wet surfaces keep a readable performance identity after launch.
+		# This linear term models tyre sink/scrub and always opposes travel; it is
+		# deterministic and shared by player, AI, replay, and network prediction.
+		longitudinal_acceleration -= float(
+			surface_profile.get("surface_speed_drag", 0.0)
+		) * longitudinal_speed
 	longitudinal_speed += longitudinal_acceleration * delta
-	if state.is_offtrack:
+	if state.is_offtrack and tyre_contact:
 		# Sand/gravel should punish a fast excursion without becoming an invisible
 		# handbrake. Resistance grows smoothly with speed, while the low-speed term
 		# stays below available first-gear/reverse force so the driver can steer and
@@ -163,6 +181,12 @@ func step(
 			longitudinal_speed,
 			0.0,
 			_offtrack_resistance(absf(longitudinal_speed)) * delta
+		)
+	elif tyre_contact:
+		longitudinal_speed = move_toward(
+			longitudinal_speed,
+			0.0,
+			float(surface_profile["rolling_resistance"]) * delta
 		)
 	var maximum_speed := config.maximum_forward_speed
 	if state.nitro_active:
@@ -178,6 +202,10 @@ func step(
 	var front_wheel_angle := state.steering_input * maximum_steer_angle
 	var requested_yaw_rate := longitudinal_speed / config.wheelbase * tan(front_wheel_angle)
 	var lateral_capacity := lateral_acceleration_capacity(absolute_speed, state.is_offtrack)
+	if not state.is_offtrack:
+		lateral_capacity *= float(surface_profile["lateral_capacity_multiplier"])
+	if not tyre_contact:
+		lateral_capacity = 0.0
 	var maximum_yaw_rate := lateral_capacity / maxf(absolute_speed, 12.0)
 	var yaw_rate := clampf(requested_yaw_rate, -maximum_yaw_rate, maximum_yaw_rate)
 	state.heading = wrapf(state.heading + yaw_rate * delta, -PI, PI)
@@ -191,6 +219,10 @@ func step(
 		grip = config.drift_grip
 	if state.is_offtrack:
 		grip *= 0.55
+	else:
+		grip *= float(surface_profile["lateral_grip_multiplier"])
+	if not tyre_contact:
+		grip = 0.0
 	var excess_slip := maxf(0.0, absf(state.slip_angle) / config.peak_slip_angle - 1.0)
 	var slide_grip_factor := lerpf(
 		1.0, config.minimum_slide_grip, clampf(excess_slip * 0.55, 0.0, 1.0)
@@ -377,6 +409,15 @@ func _offtrack_resistance(speed: float) -> float:
 		config.offtrack_drag,
 		smooth_ratio
 	)
+
+
+static func _surface_multiplier(
+		profile: Dictionary,
+		key: String,
+		offtrack: bool,
+		fallback: float
+	) -> float:
+	return fallback if offtrack else float(profile.get(key, fallback))
 
 
 static func world_lateral_acceleration_to_g(world_acceleration: float) -> float:
@@ -831,20 +872,15 @@ func _crest_launch_velocity_mps(
 	var deck_half_units := float(zone.get("deck_half_length", 0.0))
 	var ramp_half_units := float(zone.get("ramp_half_length", 0.0))
 	var ramp_run_m := (ramp_half_units - deck_half_units) * WORLD_UNIT_TO_METERS
-	var flat_deck_run_m := deck_half_units * 2.0 * WORLD_UNIT_TO_METERS
-	if ramp_run_m <= 0.0 or flat_deck_run_m <= 0.0:
+	if ramp_run_m <= 0.0 or deck_half_units <= 0.0:
 		return 0.0
 	var ramp_grade := BRIDGE_HEIGHT_METERS / ramp_run_m
-	var physical_vertical_velocity := speed_mps * ramp_grade
-	# The runway cap makes the complete ballistic time fit inside most of the
-	# flat deck. Faster cars therefore float for less time instead of vaulting
-	# unrealistically beyond the bridge and above the underpass branch.
-	var deck_travel_seconds := flat_deck_run_m / maxf(speed_mps, 0.001)
-	var runway_vertical_cap := 0.5 * STANDARD_GRAVITY \
-			* deck_travel_seconds * CREST_DECK_RUNWAY_FRACTION
-	return minf(
+	var physical_vertical_velocity := speed_mps * ramp_grade \
+			* CREST_LAUNCH_GRADE_TRANSFER
+	return clampf(
 		physical_vertical_velocity,
-		minf(MAX_CREST_LAUNCH_VERTICAL_SPEED_MPS, runway_vertical_cap)
+		MIN_CREST_LAUNCH_VERTICAL_SPEED_MPS,
+		MAX_CREST_LAUNCH_VERTICAL_SPEED_MPS
 	)
 
 

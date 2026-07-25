@@ -30,16 +30,16 @@ RaceGlyph (provisional name; no legal clearance) turns a single hand-drawn loop 
 
 - Draw one closed line with touch or mouse.
 - Undo, redo, clear, confirm, closure guidance, live smoothing, and haptic validation feedback.
-- Optional length, width, direction, pit side, theme, and decoration-density controls.
-- Validate closure, bounds, radius, start straight, grid, pit feasibility, and crossings.
-- Offer reversible auto-fixes and show a before/after overlay.
+- Keep drawing controls under `DRAW TRACK`; place length, width, direction, pit side, theme, road surface, and decoration density in a separate clipped `WORLD & ROAD` section.
+- Validate closure, bounds, radius, start straight, grid, pit feasibility, and crossings. Apply only very-local rounding to unsafe extreme points, create safe bridges at clean crossings, and choose the safest viable grid automatically.
+- BUILD CIRCUIT proceeds directly to the circuit tour. There is no manual grid-position review or MOVE GRID confirmation page.
 - Save, reload, rename, edit, thumbnail, export, and delete local tracks.
 
 ### Offline Race
 
 - Predefined or user-created track.
 - Configurable 2–12-driver grid: one player plus 1–11 AI opponents, with lap count, difficulty, assists, and collision configuration.
-- Intro, countdown, ordered checkpoints, lap/sector/best times, live position, minimap, pause, finish order, results, restart, and return to studio.
+- Intro, countdown, ordered checkpoints, lap/sector/best times, live position, minimap, pause, finish order, restart, and return to studio. After the player takes the flag, remaining AI continue under authority and the results panel updates each exact finish time until the complete field is classified.
 - Toggle at any time between an in-cockpit view with a responsive steering wheel and an elevated behind-the-car chase view.
 - Fully functional without authentication or network access.
 
@@ -63,13 +63,13 @@ All screens require safe-area support, phone/tablet responsiveness, readable typ
 
 ## Track output
 
-The deterministic pipeline produces road, edge, curbs, markings, runoff, barriers, fencing, pit lane/building, start/finish, grid, ordered checkpoints, racing lanes, minimap, bridge layers, recovery points, and seeded decoration. The first release requires several predefined tracks and one fully polished natural/forest theme before additional themes expand scope.
+The deterministic pipeline produces road, edge, curbs, markings, runoff, barriers, fencing, pit lane/building, start/finish, grid, ordered checkpoints, racing lanes, minimap, bridge layers, recovery points, seeded decoration, and one of five released surfaces: smooth asphalt, weathered asphalt, bumpy asphalt, compact gravel, or mud. Each surface has distinct geometry-scale texture language, roughness, drive efficiency, speed drag, rolling resistance, tyre grip, braking, AI target speed, grounded suspension motion, vehicle coating, and bounded moving presentation effects. Weathered asphalt has wet film/rain/mist; bumpy asphalt has irregular repairs/cracks/chips and road dust; gravel has aggregate/stones/tan dust; mud has ruts/puddles/clods/dark spray and body splatter.
 
 ## Driving and presentation
 
-- Arcade acceleration, braking, reverse, speed-sensitive steering, grip/slip, drag, surface effects, collisions, and reset/recovery.
+- Arcade acceleration, braking, reverse, speed-sensitive steering, grip/slip, drag, deterministic surface effects, collisions, bounded gravity-driven crest airtime, exact landing, and reset/recovery.
 - Touch buttons or steering wheel, accelerator, brake/reverse, optional tilt, left-handed layout, optional auto-accelerate, steering/braking assists, keyboard, and controller. Auto-accelerate is off by default.
-- Cockpit camera with visible steering-wheel response plus elevated chase camera with restrained look-ahead/shake; dynamic shadows, body response, smoke, dust, sparks, debris, skid marks, and brake glow.
+- Cockpit camera with visible steering-wheel response and complete halo guard plus elevated chase camera with restrained look-ahead/shake, separately smoothed bridge-grade pitch, and the forward triangular halo frame hidden; dynamic shadows, grade-aligned body response, smoke, rain, spray, dust, sparks, debris, skid marks, and brake glow.
 - Plan-view imagery is limited to Track Studio, circuit selection/tour, and the HUD minimap. The race viewport is always perspective.
 - Independent master, engine, effects, ambience, UI, and music levels.
 

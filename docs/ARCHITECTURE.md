@@ -57,7 +57,7 @@ Dependencies point inward. Domain code must not read the scene tree, renderer, c
 ## Race simulation
 
 - Fixed-step simulation; display interpolation must not alter authority.
-- Formula-style vehicle authority uses an eight-speed sequential automatic gearbox, road-speed/RPM coupling, shift torque cuts, engine braking, speed-sensitive bicycle steering, tyre slip/grip, aerodynamic load, and bounded carbon-brake/traction behavior. Exact parameters and tested limits are in `VEHICLE_DYNAMICS.md`.
+- Formula-style vehicle authority uses an eight-speed sequential automatic gearbox, road-speed/RPM coupling, shift torque cuts, engine braking, speed-sensitive bicycle steering, tyre slip/grip, aerodynamic load, versioned road-surface profiles, and bounded carbon-brake/traction behavior. Crest launches follow a fixed-step standard-gravity arc with no tyre force while airborne. Exact parameters and tested limits are in `VEHICLE_DYNAMICS.md`.
 - Shipped player input is an explicit bounded command: steering, throttle, brake/reverse, sequence, and tick. A dormant nitro bit remains only in the versioned internal/replay contract for compatibility and is forced false at race and network authority boundaries.
 - Vehicle state is plain serializable data suitable for tests and snapshots, including gear/RPM/shift, physical rack position, slip, and lateral-load telemetry.
 - Ordered checkpoint passage plus lap count and spline progress determine ranking.
@@ -70,7 +70,7 @@ The inventoried `icon_boost.svg` and `boost.wav` resources are dormant legacy/in
 
 ## Presentation
 
-World rendering, HUD, camera, particles, and audio subscribe to domain events. Cosmetic events may be dropped or pooled. Persistent decisions—checkpoint, lap, finish, and reset—come only from authority. `WorldCoordinateMapper` converts authority X/Y into world X/Z and normalized bridge elevation into metres; generated track and scenery roots remain at identity while vehicle Node3Ds move through them. Cockpit and chase cameras follow the interpolated player transform and consume the same immutable race state; neither is authoritative. UI navigation must work with touch and controller and honor safe-area/accessibility settings.
+World rendering, HUD, camera, particles, and audio subscribe to domain events. Cosmetic events may be dropped or pooled. Persistent decisions—checkpoint, lap, finish, and reset—come only from authority. `WorldCoordinateMapper` converts authority X/Y into world X/Z and normalized bridge elevation into metres; generated track and scenery roots remain at identity while vehicle Node3Ds move through them. Grounded presentation derives car pitch from bounded forward/back road probes and preserves ride clearance; airborne pitch derives from the ballistic velocity, never the road. The player car keeps its complete halo in cockpit but hides the four forward triangular bars in chase, while remote cars retain their full silhouette. Surface weather/debris is presentation-only and uses one rain field, one static `MultiMesh`, a fixed four-emitter pool, and one instanced coating draw per affected car rather than per-particle/per-speck nodes. Cockpit and chase cameras follow the interpolated player transform and consume the same immutable race state; neither is authoritative. Chase translation/yaw stay attached to the player while only road-grade pitch is exponentially eased and rate-limited, preventing abrupt bridge nods without positional lag. UI navigation must work with touch and controller and honor safe-area/accessibility settings.
 
 ## Persistence
 

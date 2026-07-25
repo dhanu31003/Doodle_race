@@ -12,6 +12,9 @@ const SceneryType := preload("res://game/presentation3d/trackside_scenery_3d.gd"
 const CollisionSparkPoolType := preload(
 	"res://game/presentation3d/collision_spark_pool_3d.gd"
 )
+const RoadSurfaceEffectsType := preload(
+	"res://game/presentation3d/road_surface_effects_3d.gd"
+)
 
 const CAMERA_COCKPIT: StringName = &"cockpit"
 const CAMERA_CHASE: StringName = &"chase"
@@ -23,6 +26,9 @@ const GRASS_DIFFUSE_PATH := \
 const GRASS_NORMAL_PATH := \
 		"res://assets/final/3d/materials/sparse_grass_nor_gl_1k.jpg"
 const VEHICLE_RIDE_HEIGHT_METERS := 0.075
+const VEHICLE_GRADE_PROBE_AUTHORITY_UNITS := 9.0
+const MAX_GROUNDED_PITCH_RADIANS := deg_to_rad(28.0)
+const MAX_AIRBORNE_PITCH_RADIANS := deg_to_rad(10.0)
 
 const AI_COLORS := [
 	Color("ff5364"), Color("40bff5"), Color("ffc342"), Color("9b7cff"),
@@ -52,6 +58,7 @@ var _track_root: Node3D
 var _scenery_root: TracksideScenery3D
 var _vehicle_root: Node3D
 var _collision_spark_pool: CollisionSparkPool3D
+var _road_surface_effects: RoadSurfaceEffects3D
 var _camera_rig: FormulaCameraRig3D
 var _world_environment: WorldEnvironment
 var _sun: DirectionalLight3D
@@ -68,6 +75,9 @@ var _last_player_recovery_snap_serial := -1
 var _recovery_snap_count := 0
 var _vehicle_render_budget_apply_count := 0
 var _static_world_rebuild_count := 0
+var _mobile_remote_animation_phase := 0
+var _remote_animation_update_count := 0
+var _remote_animation_skip_count := 0
 
 
 func _ready() -> void:
@@ -90,6 +100,9 @@ func configure(
 	_player = null
 	_entries.clear()
 	_command = null
+	_mobile_remote_animation_phase = 0
+	_remote_animation_update_count = 0
+	_remote_animation_skip_count = 0
 	_clear_vehicles()
 	set_camera_mode(mode)
 	_rebuild_static_world()
@@ -115,6 +128,7 @@ func configure_accessibility(
 	var previous_mobile_budget := _uses_mobile_render_budget()
 	var scenery_quality_changed := _low_graphics != low_graphics \
 			or _high_contrast != high_contrast
+	var motion_profile_changed := _reduced_motion != reduced_motion
 	_low_graphics = low_graphics
 	_reduced_motion = reduced_motion
 	_high_contrast = high_contrast
@@ -135,6 +149,11 @@ func configure_accessibility(
 	elif scenery_quality_changed and _track != null and _track.is_valid():
 		_scenery_root.configure(
 			_track, _uses_mobile_render_budget(), _high_contrast
+		)
+	if not mobile_budget_changed and motion_profile_changed \
+			and _track != null and _track.is_valid():
+		_road_surface_effects.configure(
+			_track, _uses_mobile_render_budget(), _reduced_motion
 		)
 
 
@@ -219,6 +238,7 @@ func debug_snapshot() -> Dictionary:
 	var player_cockpit_detail_visible := false
 	var player_visible_cockpit_details := 0
 	var player_cockpit_visibility_apply_count := 0
+	var player_surface_appearance: Dictionary = {}
 	for id in _vehicles:
 		var vehicle := _vehicles[id] as Node3D
 		if vehicle != null and is_instance_valid(vehicle):
@@ -231,6 +251,7 @@ func debug_snapshot() -> Dictionary:
 				if cockpit_lod_counts.has(lod_tier):
 					cockpit_lod_counts[lod_tier] = int(cockpit_lod_counts[lod_tier]) + 1
 				if str(id) == _player_visual_id:
+					player_surface_appearance = vehicle_presentation.duplicate(true)
 					player_cockpit_detail_visible = bool(vehicle_presentation.get(
 						"cockpit_detail_visible", false
 					))
@@ -291,8 +312,30 @@ func debug_snapshot() -> Dictionary:
 		"player_cockpit_detail_visible": player_cockpit_detail_visible,
 		"player_visible_cockpit_details": player_visible_cockpit_details,
 		"player_cockpit_visibility_apply_count": player_cockpit_visibility_apply_count,
+		"player_road_surface": str(player_surface_appearance.get("road_surface", "")),
+		"player_surface_coating_visible": bool(
+			player_surface_appearance.get("surface_coating_visible", false)
+		),
+		"player_surface_coating_count": int(
+			player_surface_appearance.get("surface_coating_count", 0)
+		),
+		"player_surface_coating_visible_count": int(
+			player_surface_appearance.get("surface_coating_visible_count", 0)
+		),
+		"player_surface_coating_opacity": float(
+			player_surface_appearance.get("surface_coating_opacity", 0.0)
+		),
+		"player_surface_lap_progress": float(
+			player_surface_appearance.get("surface_lap_progress", 0.0)
+		),
+		"player_mud_accumulation": float(
+			player_surface_appearance.get("mud_accumulation", 0.0)
+		),
 		"mobile_device_profile": _is_mobile_runtime(),
 		"mobile_render_budget": _uses_mobile_render_budget(),
+		"mobile_remote_animation_stride": 2 if _uses_mobile_render_budget() else 1,
+		"remote_animation_update_count": _remote_animation_update_count,
+		"remote_animation_skip_count": _remote_animation_skip_count,
 		"vehicle_render_budget_apply_count": _vehicle_render_budget_apply_count,
 		"static_world_rebuild_count": _static_world_rebuild_count,
 		"viewport_stretch_shrink": _viewport_container.stretch_shrink,
@@ -346,6 +389,11 @@ func debug_snapshot() -> Dictionary:
 		"collision_sparks": (
 			_collision_spark_pool.presentation_snapshot()
 			if _collision_spark_pool != null and is_instance_valid(_collision_spark_pool)
+			else {}
+		),
+		"road_surface_effects": (
+			_road_surface_effects.presentation_snapshot()
+			if _road_surface_effects != null and is_instance_valid(_road_surface_effects)
 			else {}
 		),
 		"player_recovery_hard_snap_serial": player_recovery_serial,
@@ -445,6 +493,9 @@ func _ensure_scene() -> void:
 	_collision_spark_pool = CollisionSparkPoolType.new()
 	_collision_spark_pool.name = "CollisionSparkPool"
 	_world_root.add_child(_collision_spark_pool)
+	_road_surface_effects = RoadSurfaceEffectsType.new()
+	_road_surface_effects.name = "RoadSurfaceEffects"
+	_world_root.add_child(_road_surface_effects)
 
 	_camera_rig = CameraRigType.new()
 	_camera_rig.name = "FormulaCameraRig"
@@ -562,6 +613,7 @@ func _rebuild_static_world() -> void:
 	var options := {
 		"sample_step_authority": 10.0 \
 				if _uses_mobile_render_budget() else 5.0,
+		"mobile_surface_budget": _uses_mobile_render_budget(),
 	}
 	var build_result: Dictionary = TrackBuilder.build(_track, options)
 	var circuit_mesh: ArrayMesh
@@ -581,6 +633,9 @@ func _rebuild_static_world() -> void:
 	_build_ground(_track)
 	_scenery_root.configure(
 		_track, _uses_mobile_render_budget(), _high_contrast
+	)
+	_road_surface_effects.configure(
+		_track, _uses_mobile_render_budget(), _reduced_motion
 	)
 
 
@@ -700,6 +755,8 @@ func _fallback_track_mesh(track: RaceTrackQuery) -> ArrayMesh:
 func _update_vehicle_presentations() -> void:
 	var active_ids: Dictionary = {}
 	var frame_delta := clampf(get_process_delta_time(), 0.001, 0.1)
+	var mobile_budget := _uses_mobile_render_budget()
+	var remote_index := 0
 	for entry in _entries:
 		if entry == null or entry.state == null:
 			continue
@@ -730,9 +787,40 @@ func _update_vehicle_presentations() -> void:
 		visual.transform = _interpolated_vehicle_transform(
 			entry, 1.0 if hard_snap else _alpha
 		)
+		# Opponent transforms remain fully interpolated every display frame. Only
+		# presentation-only wheels, suspension, lights and dirt stages are evenly
+		# divided across two mobile phases, preventing a full-pack CPU spike.
+		var update_animation := true
+		if not is_player and mobile_budget:
+			update_animation = posmod(
+				remote_index + _mobile_remote_animation_phase, 2
+			) == 0
+			remote_index += 1
+			if update_animation:
+				_remote_animation_update_count += 1
+			else:
+				_remote_animation_skip_count += 1
+		elif not is_player:
+			_remote_animation_update_count += 1
+		if update_animation and visual.has_method("set_surface_lap_progress"):
+			visual.call(
+				"set_surface_lap_progress", _surface_lap_progress_for_entry(entry)
+			)
 		var entry_command: RaceInput = _command if is_player else null
-		if visual.has_method("apply_vehicle_state"):
-			visual.call("apply_vehicle_state", entry.state, entry_command, frame_delta)
+		if update_animation and visual.has_method("apply_vehicle_state"):
+			var surface_bump := 0.0
+			if entry.state.is_grounded and not _reduced_motion \
+					and _track != null and _track.is_valid():
+				surface_bump = _track.surface_bump_height_meters(
+					entry.state.track_distance
+				)
+			visual.call(
+				"apply_vehicle_state",
+				entry.state,
+				entry_command,
+				frame_delta,
+				surface_bump
+			)
 		if current_contact_serial > previous_contact_serial:
 			_present_vehicle_contact(entry, id, current_contact_serial)
 		if is_player:
@@ -754,6 +842,27 @@ func _update_vehicle_presentations() -> void:
 		_vehicle_contact_serials.erase(id)
 		if stale != null and is_instance_valid(stale):
 			stale.queue_free()
+	if _road_surface_effects != null and is_instance_valid(_road_surface_effects):
+		_road_surface_effects.update_vehicles(
+			_entries, _vehicles, _player_visual_id
+		)
+	_mobile_remote_animation_phase = (_mobile_remote_animation_phase + 1) % 2 \
+			if mobile_budget else 0
+
+
+func _surface_lap_progress_for_entry(entry: RaceEntry) -> float:
+	if entry == null or entry.state == null or _track == null \
+			or not _track.is_valid() or _track.total_length <= 0.0:
+		return 0.0
+	if entry.lap_tracker != null:
+		return clampf(
+			entry.classification_progress() / _track.total_length, 0.0, 1.0
+		)
+	return clampf(
+		_track.wrap_distance(entry.state.track_distance) / _track.total_length,
+		0.0,
+		1.0
+	)
 
 
 func _vehicle_for_entry(entry: RaceEntry, is_player: bool) -> Node3D:
@@ -764,6 +873,8 @@ func _vehicle_for_entry(entry: RaceEntry, is_player: bool) -> Node3D:
 		return _vehicles[id] as Node3D
 	var visual := _instantiate_formula_visual(_color_for_entry(entry), is_player)
 	visual.name = "FormulaCar_%s" % id
+	if visual.has_method("configure_surface") and _track != null and _track.is_valid():
+		visual.call("configure_surface", _track.road_surface)
 	_vehicle_root.add_child(visual)
 	if is_player and visual.has_method("set_cockpit_detail_visible"):
 		visual.call(
@@ -931,9 +1042,69 @@ func _interpolated_vehicle_transform(entry: RaceEntry, alpha: float) -> Transfor
 	var vertical_offset := lerpf(
 		previous.vertical_offset_meters, current.vertical_offset_meters, alpha
 	)
-	return Mapper.authority_transform(
-		position, heading, elevation,
-		VEHICLE_RIDE_HEIGHT_METERS + maxf(vertical_offset, 0.0)
+	var pitch := _vehicle_pitch_radians(previous, current, alpha)
+	var yaw_basis := Basis(Vector3.UP, Mapper.authority_heading_to_world_yaw(heading))
+	# Formula visuals use local +X as forward. Positive local-Z rotation lifts
+	# that axis, matching an uphill road grade without changing steering yaw.
+	var basis := yaw_basis * Basis(Vector3.BACK, pitch)
+	return Transform3D(
+		basis,
+		Mapper.authority_position_to_world(
+			position,
+			elevation,
+			VEHICLE_RIDE_HEIGHT_METERS + maxf(vertical_offset, 0.0)
+		)
+	)
+
+
+func _vehicle_pitch_radians(previous: VehicleState, current: VehicleState, alpha: float) -> float:
+	if _track == null or not _track.is_valid():
+		return 0.0
+	var grounded := current.is_grounded \
+			or (previous.is_grounded and alpha < 0.5 and current.vertical_offset_meters < 0.02)
+	if not grounded:
+		# Once airborne the road no longer owns the car attitude. A restrained
+		# trajectory pitch makes crest launches float naturally instead of snapping
+		# back to a road-aligned or perfectly flat pose.
+		var velocity := previous.velocity.lerp(current.velocity, alpha)
+		var horizontal_speed_mps := Mapper.authority_scalar_to_meters(velocity.length())
+		var vertical_speed_mps := lerpf(
+			previous.vertical_velocity_mps, current.vertical_velocity_mps, alpha
+		)
+		if horizontal_speed_mps <= 0.1:
+			return 0.0
+		return clampf(
+			atan2(vertical_speed_mps, horizontal_speed_mps),
+			-MAX_AIRBORNE_PITCH_RADIANS,
+			MAX_AIRBORNE_PITCH_RADIANS
+		)
+	var distance := previous.track_distance + _track.forward_delta(
+		previous.track_distance, current.track_distance
+	) * alpha
+	var behind := _track.sample_at_distance(
+		distance - VEHICLE_GRADE_PROBE_AUTHORITY_UNITS * 0.5
+	)
+	var ahead := _track.sample_at_distance(
+		distance + VEHICLE_GRADE_PROBE_AUTHORITY_UNITS * 0.5
+	)
+	if behind.is_empty() or ahead.is_empty():
+		return 0.0
+	var behind_world := Mapper.authority_position_to_world(
+		behind.get("position", Vector2.ZERO),
+		float(behind.get("elevation_level", 0.0))
+	)
+	var ahead_world := Mapper.authority_position_to_world(
+		ahead.get("position", Vector2.ZERO),
+		float(ahead.get("elevation_level", 0.0))
+	)
+	var grade := ahead_world - behind_world
+	var horizontal_length := Vector2(grade.x, grade.z).length()
+	if horizontal_length <= 0.0001:
+		return 0.0
+	return clampf(
+		atan2(grade.y, horizontal_length),
+		-MAX_GROUNDED_PITCH_RADIANS,
+		MAX_GROUNDED_PITCH_RADIANS
 	)
 
 
@@ -997,6 +1168,8 @@ func _clear_vehicles() -> void:
 	_recovery_snap_count = 0
 	if _collision_spark_pool != null and is_instance_valid(_collision_spark_pool):
 		_collision_spark_pool.reset_pool()
+	if _road_surface_effects != null and is_instance_valid(_road_surface_effects):
+		_road_surface_effects.reset_effects()
 	if _vehicle_root == null:
 		return
 	for child in _vehicle_root.get_children():
@@ -1006,6 +1179,8 @@ func _clear_vehicles() -> void:
 
 func _clear_static_world() -> void:
 	_last_track_stats.clear()
+	if _road_surface_effects != null and is_instance_valid(_road_surface_effects):
+		_road_surface_effects.reset_effects()
 	if _ground_root != null:
 		_clear_node_children(_ground_root)
 	if _track_root != null:

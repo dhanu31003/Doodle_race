@@ -70,6 +70,9 @@ var results_panel: PanelContainer
 var minimap: RaceMinimap
 var camera_button: Button
 var recovery_label: Label
+var _results_classification_signature := ""
+var _results_official_time := 0.0
+var _results_persistence_summary: Dictionary = {}
 
 
 func set_payload(value: Dictionary) -> void:
@@ -646,6 +649,9 @@ func _start_race() -> void:
 	minimap.update_entries(director.entries)
 	paused = false
 	finished = false
+	_results_classification_signature = ""
+	_results_official_time = 0.0
+	_results_persistence_summary.clear()
 	last_completed_laps = 0
 	lap_started_at = 0.0
 	best_lap_seconds = INF
@@ -687,10 +693,10 @@ func _clear_racer_visuals() -> void:
 
 
 func _process(delta: float) -> void:
-	if director == null or finished:
+	if director == null:
 		return
 	var command := RaceInputType.new()
-	if director.phase == RaceDirectorType.PHASE_RACING and not paused:
+	if not finished and director.phase == RaceDirectorType.PHASE_RACING and not paused:
 		command = input_adapter.sample(settings, _assist_context())
 		# RaceInput keeps this legacy bit for replay compatibility, but shipped
 		# gameplay intentionally exposes only the conventional pedal contract.
@@ -703,15 +709,21 @@ func _process(delta: float) -> void:
 		if recovery_cue_remaining <= 0.0 and settings.reduced_motion:
 			recovery_label.visible = false
 	_update_countdown(phase_before, delta)
-	_update_feedback()
-	_update_engine_audio(command)
+	if not finished:
+		_update_feedback()
+		_update_engine_audio(command)
 	var interpolation := 1.0 if paused or director.phase != RaceDirectorType.PHASE_RACING else director.interpolation_alpha()
 	_render_authority(interpolation)
 	_update_hud()
 	minimap.update_entries(director.entries)
 	var player := director.entry(PLAYER_ID)
-	if player != null and (player.status == RaceEntry.STATUS_FINISHED or player.status == RaceEntry.STATUS_DNF):
+	if not finished and player != null and (
+		player.status == RaceEntry.STATUS_FINISHED
+		or player.status == RaceEntry.STATUS_DNF
+	):
 		_finish_race()
+	elif finished:
+		_refresh_results_panel_if_changed()
 	last_phase = director.phase
 
 
@@ -854,22 +866,29 @@ func _toggle_pause() -> void:
 func _set_paused(value: bool) -> void:
 	paused = value
 	director.set_paused(paused)
-	pause_panel.visible = paused
+	pause_panel.visible = paused and not finished
 	if paused:
 		_release_controls()
 	_set_audio_paused(paused)
 
 
 func on_application_paused() -> void:
-	if director != null and not finished and (
-			director.phase == RaceDirectorType.PHASE_COUNTDOWN
-			or director.phase == RaceDirectorType.PHASE_RACING
+	if director != null and (
+		director.phase == RaceDirectorType.PHASE_COUNTDOWN
+		or director.phase == RaceDirectorType.PHASE_RACING
 	):
 		_set_paused(true)
 
 
 func on_application_resumed() -> void:
 	# Never resume driving without an explicit player action after interruption.
+	# Once the player has already finished there is no driving input to expose;
+	# resume the remaining AI classification automatically so results cannot stall.
+	if finished and paused and director != null:
+		paused = false
+		director.set_paused(false)
+		_set_audio_paused(false)
+		return
 	_set_audio_paused(paused)
 
 
@@ -935,7 +954,6 @@ func _finish_race() -> void:
 	if finished:
 		return
 	finished = true
-	director.set_paused(true)
 	_release_controls()
 	_play_sfx(&"finish")
 	_stop_engine_audio()
@@ -945,7 +963,64 @@ func _finish_race() -> void:
 	final_position = player.race_position
 	var official_time := player.finish_time if player.finish_time >= 0.0 else director.race_time
 	var persistence_summary := _record_local_result(player, official_time)
+	_results_official_time = official_time
+	_results_persistence_summary = persistence_summary.duplicate(true)
+	_results_classification_signature = ""
+	_render_results_panel()
+
+
+func _refresh_results_panel_if_changed(force: bool = false) -> void:
+	if director == null or not finished:
+		return
+	var signature := _classification_signature()
+	if force or signature != _results_classification_signature:
+		_render_results_panel()
+
+
+func _classification_signature() -> String:
+	var parts := PackedStringArray([str(director.phase)])
+	for row in classification_rows(director.standings()):
+		parts.append("%d:%s:%d:%s" % [
+			int(row.get("position", 0)),
+			str(row.get("status", "")),
+			int(row.get("finish_time_ms", -1)),
+			str(row.get("dnf_reason", "")),
+		])
+	return "|".join(parts)
+
+
+func _field_is_classified() -> bool:
+	if director == null or director.entries.is_empty():
+		return false
+	for entry in director.entries:
+		if entry.status != RaceEntry.STATUS_FINISHED \
+				and entry.status != RaceEntry.STATUS_DNF:
+			return false
+	return true
+
+
+func _classified_count() -> int:
+	var count := 0
+	if director == null:
+		return count
+	for entry in director.entries:
+		if entry.status == RaceEntry.STATUS_FINISHED \
+				or entry.status == RaceEntry.STATUS_DNF:
+			count += 1
+	return count
+
+
+func _render_results_panel() -> void:
+	if director == null or results_panel == null:
+		return
+	var player := director.entry(PLAYER_ID)
+	if player == null:
+		return
+	var official_time := _results_official_time
+	var persistence_summary := _results_persistence_summary
 	var official_standings := director.standings()
+	var field_classified := _field_is_classified()
+	_results_classification_signature = _classification_signature()
 	results_panel.visible = true
 	for child in results_panel.get_children():
 		child.queue_free()
@@ -973,7 +1048,12 @@ func _finish_race() -> void:
 	var persistence_warning := local_persistence_warning(persistence_summary)
 	if not persistence_warning.is_empty():
 		content.add_child(DesignSystem.label("⚠  " + persistence_warning, 13, DesignSystem.CORAL))
-	content.add_child(DesignSystem.label("FULL CLASSIFICATION • %d DRIVERS" % director.entries.size(), 13, DesignSystem.CYAN))
+	var classification_heading := "FULL CLASSIFICATION • %d DRIVERS" \
+			% director.entries.size() if field_classified \
+			else "LIVE CLASSIFICATION • %d/%d COMPLETE" % [
+				_classified_count(), director.entries.size()
+			]
+	content.add_child(DesignSystem.label(classification_heading, 13, DesignSystem.CYAN))
 	var classification_scroll := ScrollContainer.new()
 	classification_scroll.custom_minimum_size = Vector2(620.0, 210.0)
 	classification_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -1000,10 +1080,13 @@ func _finish_race() -> void:
 		driver_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(driver_name)
 		var status := str(row_data["status"]).to_upper()
-		row.add_child(DesignSystem.label(status, 12, DesignSystem.MINT if status == "FINISHED" else DesignSystem.CORAL))
+		var status_text := "FINISHING" if status == "RACING" else status
+		var status_color := DesignSystem.MINT if status == "FINISHED" \
+				else (DesignSystem.GOLD if status == "RACING" else DesignSystem.CORAL)
+		row.add_child(DesignSystem.label(status_text, 12, status_color))
 		var timing := _format_time(float(row_data["finish_time_ms"]) / 1000.0) if int(row_data["finish_time_ms"]) >= 0 else str(row_data["dnf_reason"]).replace("_", " ").to_upper()
 		if timing.is_empty():
-			timing = "NO TIME"
+			timing = "ON TRACK" if status == "RACING" else "NO TIME"
 		var timing_label := DesignSystem.label(timing, 12, DesignSystem.MUTED)
 		timing_label.custom_minimum_size.x = 112.0
 		timing_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -1012,6 +1095,8 @@ func _finish_race() -> void:
 	share_status.custom_minimum_size.y = 18.0
 	share_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(share_status)
+	if not field_classified:
+		share_status.text = "AI DRIVERS ARE STILL FINISHING — TIMES UPDATE LIVE"
 	var actions := GridContainer.new()
 	actions.columns = 2
 	actions.add_theme_constant_override("separation", 8)
@@ -1029,6 +1114,9 @@ func _finish_race() -> void:
 	var share := DesignSystem.button("SHARE RESULTS", false, true)
 	share.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	share.custom_minimum_size.x = 300.0
+	share.disabled = not field_classified
+	if not field_classified:
+		share.text = "WAIT FOR FIELD"
 	share.pressed.connect(func() -> void:
 		DisplayServer.clipboard_set(share_text)
 		share.text = "COPIED  ✓"

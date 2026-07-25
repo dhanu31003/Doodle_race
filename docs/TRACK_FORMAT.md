@@ -1,6 +1,6 @@
 # TrackDefinition Format
 
-Status: **implemented schema-v1 contract**. Strict decoding, canonical hashing, quantization checks, v0→v1 migration, malformed-input rejection, and deterministic compilation fixtures exist in the repository. Exact test outcomes belong in `TEST_REPORT.md`; desktop coverage is not cross-platform Android/iOS determinism proof.
+Status: **implemented schema-v2 contract**. Strict decoding, canonical hashing, quantization checks, v0→v1→v2 migration, malformed-input rejection, and deterministic compilation fixtures exist in the repository. Exact test outcomes belong in `TEST_REPORT.md`; desktop coverage is not cross-platform Android/iOS determinism proof.
 
 ## Purpose
 
@@ -8,14 +8,14 @@ Status: **implemented schema-v1 contract**. Strict decoding, canonical hashing, 
 
 Implementation: `game/track/definition/track_definition.gd`, `bridge_crossing_definition.gd`, `track_definition_migrator.gd`, `game/core/canonical_json.gd`, and `game/config/game_limits.gd`.
 
-## Schema 1 envelope
+## Schema 2 envelope
 
 Canonical transport is UTF-8 JSON. This structural example is illustrative, not a passing fixture:
 
 ```json
 {
-  "schema_version": 1,
-  "generator_version": 2,
+  "schema_version": 2,
+  "generator_version": 3,
   "track_id": "track-0123456789abcdef",
   "track_name": "Pine Loop",
   "author_id": "local-anonymous",
@@ -25,6 +25,7 @@ Canonical transport is UTF-8 JSON. This structural example is illustrative, not 
   "target_length": 1200,
   "track_width": 72,
   "theme": "classic",
+  "road_surface": "smooth_asphalt",
   "pit_side": "none",
   "decoration_density": 0.5,
   "deterministic_seed": "12345",
@@ -40,8 +41,8 @@ Canonical transport is UTF-8 JSON. This structural example is illustrative, not 
 
 | Field | Implemented representation/rule |
 |---|---|
-| `schema_version` | Integer; current supported output is `1`. A deterministic v0→v1 migrator and golden legacy fixture exist. |
-| `generator_version` | Positive integer; the release compiler emits `2`. Exact source/generator/compiled fingerprints are required by the multiplayer ready gate. |
+| `schema_version` | Integer; current supported output is `2`. Deterministic v0→v1 and v1→v2 migrations plus a golden legacy fixture exist. |
+| `generator_version` | Positive integer; the release compiler emits `3`. Exact source/generator/compiled fingerprints are required by the multiplayer ready gate. |
 | `track_id` | UTF-8 string up to 96 bytes. Empty IDs created through `create()` become `track-` plus the first 16 hex characters of a deterministic SHA-256. |
 | `track_name` | Non-empty after trimming; up to 80 Godot string characters. Control/bidi policy still needs hardening. |
 | `author_id` | Opaque UTF-8 string up to 128 bytes; no real name is required. |
@@ -51,6 +52,7 @@ Canonical transport is UTF-8 JSON. This structural example is illustrative, not 
 | `target_length` | Finite project units, `500..100000`. Released physical unit mapping must remain stable. |
 | `track_width` | Finite project units, `12..512`, and less than half the smaller canvas side. |
 | `theme` | Non-empty UTF-8 identifier up to 64 bytes; current default is `classic`. Released theme allow-list is not yet enforced. |
+| `road_surface` | Released enum: `smooth_asphalt`, `weathered_asphalt`, `bumpy_asphalt`, `compact_gravel`, or `mud`; UTF-8 payload cap is 32 bytes. It controls deterministic visual texture, rolling resistance, grip, braking, AI target speed, grounded suspension motion, and bounded presentation-only rain/spray/debris. |
 | `pit_side` | `none`, `left`, or `right`. |
 | `decoration_density` | Finite value in `[0,1]`. |
 | `deterministic_seed` | GDScript signed 64-bit integer in memory, serialized canonically as signed decimal text. Legacy numeric input is accepted only inside JavaScript's safe-integer range. |
@@ -59,7 +61,7 @@ Canonical transport is UTF-8 JSON. This structural example is illustrative, not 
 | timestamps | Non-negative JSON-safe integer values; update must not precede creation. Current persistence treats them as Unix seconds. |
 | `content_hash` | SHA-256 of canonical JSON with only this field omitted; empty is accepted for an in-memory definition, stored/shared definitions should refresh and require it. |
 
-These values describe the current code, not evidence that every boundary is tested or a promise that v1 is release-frozen.
+These values describe the current code, not evidence that every boundary is tested or a promise that v2 is release-frozen.
 
 ## Coordinates and quantization
 
@@ -69,7 +71,7 @@ Raw touch samples are not canonical network data. Preserve them locally only whe
 
 ## Bridge crossings
 
-Each schema-1 bridge declaration is:
+Each schema-2 bridge declaration is:
 
 ```json
 {
@@ -117,7 +119,7 @@ Use named random streams derived from `deterministic_seed` so adding one decorat
 
 ## Migration policy
 
-- Current code migrates legacy schema `0` dictionaries to schema `1` with deterministic defaults/ID. `tests/fixtures/tracks/legacy_v0.json` and the track-domain runner exercise the golden migration and idempotent reparse contract.
+- Current code migrates legacy schema `0` dictionaries through schema `1` to schema `2` with deterministic defaults/ID. Schema-1 tracks receive `smooth_asphalt` and the current compiler version. `tests/fixtures/tracks/legacy_v0.json` and the track-domain runner exercise the golden migration and idempotent reparse contract.
 - Decode the declared version, validate its permitted shape, migrate one version at a time, validate again, refresh hash, and write beside a backup.
 - Migrations must be deterministic and idempotent; never mutate the only saved copy in place.
 - Retain golden input, canonical bytes, hash, and generated metrics for every released schema/generator pair.
@@ -126,4 +128,4 @@ Use named random streams derived from `deterministic_seed` so adding one decorat
 
 ## Required fixtures
 
-The repository runners cover round-trip/canonical key order, quantization, max point/size/crossing bounds, malformed and nested types, NaN/infinity, unknown fields/enums/versions, hash mismatch, 64-bit seed preservation, closure/radius, bridge topology/order/layers, and v0→v1 idempotence. Unicode control/bidi policy and identical authoritative generation/hash on exported Android and iOS builds remain release-review items. Results and candidate evidence are reported in `TEST_REPORT.md`, not inferred from this inventory.
+The repository runners cover round-trip/canonical key order, quantization, max point/size/crossing bounds, malformed and nested types, NaN/infinity, unknown fields/enums/versions, hash mismatch, 64-bit seed preservation, surface validation, closure/radius, bridge topology/order/layers, and v0→v1→v2 idempotence. Unicode control/bidi policy and identical authoritative generation/hash on exported Android and iOS builds remain release-review items. Results and candidate evidence are reported in `TEST_REPORT.md`, not inferred from this inventory.

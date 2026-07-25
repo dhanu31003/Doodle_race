@@ -11,6 +11,7 @@ const LapTrackerType := preload("res://game/race/lap_tracker.gd")
 const DirectorType := preload("res://game/race/race_director.gd")
 const TrackBuilderType := preload("res://game/presentation3d/track_mesh_builder_3d.gd")
 const MapperType := preload("res://game/presentation3d/world_coordinate_mapper.gd")
+const RoadSurfaceCatalogType := preload("res://game/content/road_surface_catalog.gd")
 
 const PREVIOUS_RELEASE_GEOMETRY := {
 	"builtin-evergreen-oval": {"length": 1600.0, "width": 36.0},
@@ -36,6 +37,7 @@ func run() -> Dictionary:
 	var ids: Dictionary = {}
 	var hashes: Dictionary = {}
 	var archetypes: Dictionary = {}
+	var road_surfaces: Dictionary = {}
 	var pit_count := 0
 	var bridge_count := 0
 	var minimum_difficulty := 99
@@ -49,6 +51,11 @@ func run() -> Dictionary:
 		test.assert_false(archetypes.has(archetype), "%s archetype is unique across the six defaults" % definition.track_id)
 		archetypes[archetype] = true
 		var difficulty := int(item.get("difficulty", 0))
+		test.assert_true(
+			RoadSurfaceCatalogType.is_supported(definition.road_surface),
+			"%s declares a supported road surface" % definition.track_id
+		)
+		road_surfaces[definition.road_surface] = true
 		minimum_difficulty = mini(minimum_difficulty, difficulty)
 		maximum_difficulty = maxi(maximum_difficulty, difficulty)
 		test.assert_false(ids.has(definition.track_id), "predefined track IDs must be unique")
@@ -97,6 +104,7 @@ func run() -> Dictionary:
 	test.assert_true(bridge_count >= 1, "release catalog must ship at least one explicit overpass")
 	test.assert_equal(minimum_difficulty, 1, "default catalog retains an accessible unusual circuit")
 	test.assert_equal(maximum_difficulty, 4, "default catalog retains expert unusual circuits")
+	test.assert_true(road_surfaces.size() >= 4, "default catalog demonstrates at least four distinct road surfaces")
 	_test_custom_track_isolation(test)
 	_test_file_exchange(test, items[0]["definition"])
 	return test.result("predefined_track_catalog")
@@ -154,6 +162,7 @@ func _test_release_geometry(
 		return
 	test.assert_near(query.total_length, compiled.total_length, 0.001, "%s race, compiler and timing use one lap length" % track_id)
 	test.assert_near(query.track_width, compiled.track_width, 0.001, "%s race barriers use the compiled road width" % track_id)
+	test.assert_equal(query.road_surface, definition.road_surface, "%s race authority retains its selected road surface" % track_id)
 	var lap_tracker := LapTrackerType.new()
 	test.assert_true(lap_tracker.configure(query, 3, 12), "%s builds twelve ordered race checkpoints" % track_id)
 	test.assert_equal(lap_tracker._gate_distances.size(), 12, "%s checkpoint lattice is complete" % track_id)
@@ -177,6 +186,7 @@ func _test_release_geometry(
 	test.assert_true(bool(mesh_result.get("ok", false)), "%s builds mobile-density asphalt, kerbs and runoff" % track_id)
 	if bool(mesh_result.get("ok", false)):
 		var stats: Dictionary = mesh_result["stats"]
+		test.assert_equal(str(stats["road_surface"]), str(definition.road_surface), "%s 3D mesh uses the authoritative road surface" % track_id)
 		test.assert_near(float(stats["lap_length_meters"]), lap_length_m, 0.001, "%s mesh lap length aligns with timing" % track_id)
 		test.assert_near(float(stats["road_width_meters"]), road_width_m, 0.001, "%s mesh asphalt width aligns with barriers" % track_id)
 		test.assert_true(float(stats["runoff_width_each_side_meters"]) >= 3.2, "%s retains safe runoff beyond widened asphalt" % track_id)

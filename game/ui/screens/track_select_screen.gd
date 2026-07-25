@@ -5,6 +5,7 @@ signal navigate_requested(route: String, payload: Dictionary)
 const CatalogType := preload("res://game/content/predefined_track_catalog.gd")
 const CompilerType := preload("res://game/track/generation/track_compiler.gd")
 const TrackRendererType := preload("res://game/track/rendering/track_renderer.gd")
+const RoadSurfaceCatalogType := preload("res://game/content/road_surface_catalog.gd")
 
 var _items: Array[Dictionary] = []
 var _selected: Dictionary
@@ -178,8 +179,9 @@ func _refresh_selected() -> void:
 	_name_label.add_theme_color_override("font_color", _selected["accent"])
 	_location_label.text = str(_selected["location"])
 	_description_label.text = str(_selected["description"])
-	_spec_label.text = "%d m  •  %s  •  %s" % [
+	_spec_label.text = "%d m  •  %s\n%s  •  %s" % [
 		roundi(compiled.track.total_length),
+		RoadSurfaceCatalogType.display_label(definition.road_surface, true),
 		"PIT %s" % str(definition.pit_side).to_upper() if str(definition.pit_side) != "none" else "NO PIT",
 		_difficulty_marks(int(_selected["difficulty"])),
 	]

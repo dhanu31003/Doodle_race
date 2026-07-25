@@ -5,6 +5,7 @@ extends RefCounted
 const RaceInputType := preload("res://game/race/race_input.gd")
 const AiPersonalityType := preload("res://game/ai/ai_personality.gd")
 const VehicleConfigType := preload("res://game/race/vehicle_config.gd")
+const RoadSurfaceCatalogType := preload("res://game/content/road_surface_catalog.gd")
 
 var driver_id: StringName = &""
 var personality: AiPersonality
@@ -38,9 +39,13 @@ func configure_vehicle_dynamics(source_config: VehicleConfig) -> void:
 func target_speed_for_radius(
 		minimum_radius: float,
 		in_corner: bool = false,
-		offtrack: bool = false
+		offtrack: bool = false,
+		surface_lateral_multiplier: float = 1.0,
+		surface_speed_factor: float = 1.0
 	) -> float:
-	var target_speed := maximum_speed * personality.top_speed_factor
+	var safe_lateral_multiplier := clampf(surface_lateral_multiplier, 0.1, 1.0)
+	var safe_speed_factor := clampf(surface_speed_factor, 0.1, 1.0)
+	var target_speed := maximum_speed * personality.top_speed_factor * safe_speed_factor
 	if not is_inf(minimum_radius):
 		var tyre_safety := lerpf(0.94, 0.995, personality.risk)
 		# Tight corners need additional line-tracking margin because a finite-width
@@ -50,7 +55,8 @@ func target_speed_for_radius(
 		tyre_safety = maxf(0.74, tyre_safety - tight_corner_amount * 0.16)
 		target_speed = minf(
 			target_speed,
-			_vehicle_config.corner_speed_limit_for_radius(minimum_radius, tyre_safety)
+			_vehicle_config.corner_speed_limit_for_radius(minimum_radius, tyre_safety) \
+					* sqrt(safe_lateral_multiplier)
 		)
 	if in_corner:
 		target_speed *= lerpf(0.95, 1.0, personality.skill)
@@ -62,15 +68,26 @@ func target_speed_for_radius(
 func approach_speed_for_corner(
 		minimum_radius: float,
 		distance_to_corner: float,
-		in_corner: bool = true
+		in_corner: bool = true,
+		surface_lateral_multiplier: float = 1.0,
+		surface_braking_multiplier: float = 1.0,
+		surface_speed_factor: float = 1.0
 	) -> float:
-	var corner_target := target_speed_for_radius(minimum_radius, in_corner, false)
+	var corner_target := target_speed_for_radius(
+		minimum_radius,
+		in_corner,
+		false,
+		surface_lateral_multiplier,
+		surface_speed_factor
+	)
 	var precision_amount := clampf(
 		(personality.braking_precision - 0.76) / (1.10 - 0.76), 0.0, 1.0
 	)
-	var braking_safety := lerpf(0.72, 0.90, precision_amount)
+	var braking_safety := lerpf(0.72, 0.90, precision_amount) \
+			* clampf(surface_braking_multiplier, 0.1, 1.0)
 	return minf(
-		maximum_speed * personality.top_speed_factor,
+		maximum_speed * personality.top_speed_factor \
+				* clampf(surface_speed_factor, 0.1, 1.0),
 		_vehicle_config.braking_approach_speed_limit(
 			corner_target, distance_to_corner, braking_safety
 		)
@@ -85,8 +102,14 @@ func target_speed_for_horizon(
 	) -> float:
 	if track == null or not track.is_valid():
 		return 0.0
+	var surface := RoadSurfaceCatalogType.profile(track.road_surface)
+	var surface_lateral := float(surface["lateral_capacity_multiplier"])
+	var surface_braking := float(surface["braking_multiplier"])
+	var surface_speed := float(surface["ai_speed_factor"])
 	var safe_horizon := clampf(horizon, 0.0, track.total_length * 0.5)
-	var target_speed := target_speed_for_radius(INF, false, offtrack)
+	var target_speed := target_speed_for_radius(
+		INF, false, offtrack, surface_lateral, surface_speed
+	)
 	for sample_index in range(CORNER_PROFILE_SAMPLES + 1):
 		var amount := float(sample_index) / float(CORNER_PROFILE_SAMPLES)
 		var distance_ahead := safe_horizon * amount
@@ -97,7 +120,10 @@ func target_speed_for_horizon(
 		var allowed_now := approach_speed_for_corner(
 			radius,
 			distance_ahead,
-			track.is_corner_at_distance(sample_distance)
+			track.is_corner_at_distance(sample_distance),
+			surface_lateral,
+			surface_braking,
+			surface_speed
 		)
 		target_speed = minf(target_speed, allowed_now)
 	if offtrack:

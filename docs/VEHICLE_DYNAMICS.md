@@ -7,7 +7,7 @@ Status: **implemented deterministic Formula-style model**. This model targets cr
 - Simulation runs at a fixed 60 Hz. Human, AI, replay, host authority, and guest prediction execute the same `ArcadeVehicleModel` and bounded `VehicleConfig`.
 - The only player commands remain steering, accelerator, and brake/reverse. Automatic shifting does not add a new network input.
 - Position, velocity, heading, physical rack position, gear, engine RPM, shift ticks, slip angle, driven-wheel slip, and lateral acceleration are quantized before an authority snapshot.
-- Protocol 2 / app build 0.2.0 is the live compatibility boundary. Protocol-1 peers are rejected before room admission because their predictor used the previous vehicle model.
+- Protocol 3 / app build 0.3.0 is the live compatibility boundary. Older peers are rejected before room admission because their predictor lacks the released surface and airborne-force rules.
 
 ## Eight-speed drivetrain
 
@@ -44,18 +44,34 @@ RPM is coupled to road speed and the selected ratio. Every upshift is sequential
 
 The AI now scans farther into the braking horizon and chooses curvature speeds from this same tyre envelope. Difficulty changes decision quality and risk only; it does not receive extra grip, braking, power, gears, or top speed.
 
+## Road surfaces
+
+Five deterministic profiles are released: smooth asphalt, weathered asphalt, bumpy asphalt, compact gravel, and mud. A profile changes drive efficiency, speed drag, traction, braking, lateral grip, rolling resistance, and AI target speed together with a genuinely different visual treatment—not a flat recolour. Weathered asphalt has a glossy wet film, irregular wear, light rain and fine mist; bumpy asphalt has broken organic repair islands, cracks, road dust and loose chips; gravel has multiscale aggregate, tan-dusted cars, stones and a rounded dust plume; mud has meandering ruts, puddles, progressive brown body/wheel staining, player splatter and one bounded rear clod wake. Bumpy and loose surfaces also drive a seeded, closed-loop suspension-height signal while grounded; reduced-motion mode suppresses presentation motion/rain without changing race authority.
+
+The surface identifier is part of `TrackDefinition`, the canonical source hash, and the compiled fingerprint. Player and AI cars read the same profile, so loose ground does not give the AI hidden grip. A fixed five-second full-throttle authority fixture reaches 188.58 speed units on smooth, 140.44 on weathered, 136.65 on bumpy, 83.72 on gravel, and 54.74 on mud, making the performance difference directly measurable as well as visible. The closed-loop bump function is deterministic at the lap seam and creates no physics bodies, dynamic textures, per-car scripts, or extra colliders. Mobile Mud is presentation-bounded to one player coating draw, three-stage tint-only opponents, one active 12-particle rear wake, 48 total pooled particles, 20 static details, half-rate effect binding, and a low-ALU/no-normal-sample shader branch.
+
+## Crests and airtime
+
+A car launches only when a rising road grade ends at a real crest, above a minimum speed. Its vertical speed is derived from ramp grade and forward speed, capped at 4.6 m/s, and then integrated at fixed 60 Hz under standard gravity (`9.80665 m/s²`). While airborne, tyre acceleration, braking, rolling resistance, steering, and engine braking are disabled; aerodynamic drag remains active. Landing is clamped exactly to the road height so a replay cannot accumulate a vertical offset.
+
+Presentation samples the road before and ahead of every grounded car and applies the resulting grade around the car's local lateral axis, bounded to 28 degrees while retaining chassis clearance. Airborne cars stop consuming road grade and instead use their own ballistic velocity for pitch. This prevents slope clipping without reintroducing road sticking during a jump.
+
+The chase camera remains immediately attached to the car's translated/yawed socket, but road-grade pitch uses a 4.2/s exponential response with a 42 degrees/s rate ceiling. Abrupt 24-degree climbs and 18-degree descents are therefore eased without making the camera drift behind the vehicle; cockpit behavior is unchanged.
+
+The focused 160 mph bridge fixture produces a 4.600 m/s launch, 1.683 seconds airborne, and 7.033 m maximum road clearance. This is a bounded gameplay calibration rather than proof that every custom crest reproduces a particular real circuit.
+
 ## Presentation and networking
 
 - Cockpit and chase presentation consume the physical rack position, not raw input. Cockpit shift lights and gear display consume authoritative RPM/gear/shift ticks.
 - Offline and network HUDs share one gear/RPM formatter. Engine audio pitch follows RPM, produces a bounded audible shift dip, and uses a restrained reverse tone.
-- Protocol-2 snapshots carry an all-or-nothing fixed-point Formula telemetry set. The backend validates the same bounds, Nakama normalizes the fields, local prediction replays them, and remote interpolation blends continuous telemetry while stepping discrete gear state.
-- Archived v1-shaped snapshots remain decode-safe with explicit first-gear, 4,500-RPM, centred-rack, and zero-slip defaults. They are not accepted as live protocol-2 peers.
+- Protocol-3 snapshots carry an all-or-nothing fixed-point Formula telemetry set, including the larger bounded vertical-offset range required by crest launches. The backend validates the same bounds, Nakama normalizes the fields, local prediction replays them, and remote interpolation blends continuous telemetry while stepping discrete gear state.
+- Archived v1/v2-shaped snapshots remain decode-safe with explicit first-gear, 4,500-RPM, centred-rack, and zero-slip defaults where applicable. They are not accepted as live protocol-3 peers.
 
 ## Focused verification
 
-- Race authority: 359 assertions passed, including eight sequential gears, seven RPM drops, torque cut, engine braking, 0–100 and 200–0 windows, neutral/reverse/forward transitions, steering-rate and radius behavior, lateral-g ceiling, tyre slip recovery, deterministic replay, 12-car AI, bridge traversal, and both off-track/contact recovery paths.
-- Network protocol/fake/runtime: 468 assertions passed, including bounds, optional legacy decoding, drivetrain/steering/slip round-trip, prediction, interpolation, and clean process shutdown.
-- Audio, shared HUD/persistence, and race-screen integration have dedicated focused suites. Their latest results are recorded in the task handoff and should be rerun with the final candidate gate.
+- Race authority/AI: 700 assertions passed, including eight sequential gears, seven RPM drops, torque cut, engine braking, 0–100 and 200–0 windows, neutral/reverse/forward transitions, steering-rate and radius behavior, five-surface launch ordering, lateral-g ceiling, tyre slip recovery, deterministic replay, 12-car AI, bridge traversal, 1.683-second 160 mph crest airtime, and both off-track/contact recovery paths.
+- Network protocol/fake/runtime: 530 assertions passed, including bounds, optional legacy decoding, drivetrain/steering/slip round-trip, prediction, interpolation, and clean process shutdown.
+- Presentation: Formula car 81, camera 22, surface effects 48, and fixed-world integration 112 assertions passed. Race-screen integration adds 78 assertions, including continued AI authority after the player flag and exact live/final classification times.
 
 ## Deliberate limits
 

@@ -4,7 +4,7 @@ extends RefCounted
 
 const QuantizationType := preload("res://game/core/quantization.gd")
 
-const MAX_VERTICAL_OFFSET_METERS: float = 8.0
+const MAX_VERTICAL_OFFSET_METERS: float = 12.0
 const MAX_VERTICAL_SPEED_MPS: float = 30.0
 
 var vehicle_id: StringName = &""

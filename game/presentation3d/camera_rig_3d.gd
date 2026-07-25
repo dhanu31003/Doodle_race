@@ -10,6 +10,11 @@ const CHASE_BASE_FOV := 66.0
 const COCKPIT_BASE_FOV := 70.0
 const COCKPIT_LOOK_DISTANCE := 27.0
 const COCKPIT_LOOK_DOWN_SLOPE := 0.118
+## Chase translation remains locked to the current interpolated car origin, but
+## road-grade pitch is eased separately. This removes the hard camera nod at a
+## bridge ramp/deck seam without bringing back speed-dependent world lag.
+const CHASE_GRADE_RESPONSE := 4.2
+const CHASE_MAX_GRADE_RATE_RADIANS := deg_to_rad(42.0)
 
 var camera_mode: StringName = CAMERA_CHASE
 var camera: Camera3D
@@ -24,6 +29,8 @@ var _cockpit_socket_transform := Transform3D.IDENTITY
 var _chase_socket_transform := Transform3D.IDENTITY
 var _has_cockpit_socket := false
 var _has_chase_socket := false
+var _smoothed_chase_pitch := 0.0
+var _has_smoothed_chase_pitch := false
 
 
 func _ready() -> void:
@@ -99,6 +106,8 @@ func presentation_snapshot() -> Dictionary:
 		"desired_vehicle_distance": desired_position.distance_to(_target_transform.origin),
 		"fov": camera.fov if camera != null and is_instance_valid(camera) else 0.0,
 		"desired_fov": _desired_fov() if _has_target else 0.0,
+		"target_grade_pitch_radians": _target_grade_pitch(),
+		"smoothed_chase_pitch_radians": _smoothed_chase_pitch,
 	}
 
 
@@ -106,6 +115,9 @@ func snap_to_target() -> void:
 	if not _has_target:
 		return
 	_ensure_camera()
+	if camera_mode == CAMERA_CHASE:
+		_smoothed_chase_pitch = _target_grade_pitch()
+		_has_smoothed_chase_pitch = true
 	var pose := _desired_pose()
 	camera.global_position = pose["position"]
 	_smoothed_look_at = pose["look_at"]
@@ -117,6 +129,8 @@ func _process(delta: float) -> void:
 	if not _has_target:
 		return
 	_ensure_camera()
+	if camera_mode == CAMERA_CHASE:
+		_advance_chase_grade(delta)
 	var pose := _desired_pose()
 	# A real cockpit camera is bolted to the survival cell.  Smoothing its world
 	# position independently from the rendered chassis makes the wheel, halo and
@@ -163,11 +177,12 @@ func _ensure_camera() -> void:
 
 
 func _desired_pose() -> Dictionary:
-	var forward := (_target_transform.basis * Vector3.RIGHT).normalized()
-	if forward.length_squared() < 0.5:
-		forward = Vector3.RIGHT
+	var vehicle_forward := (_target_transform.basis * Vector3.RIGHT).normalized()
+	if vehicle_forward.length_squared() < 0.5:
+		vehicle_forward = Vector3.RIGHT
 	var origin := _target_transform.origin
 	if camera_mode == CAMERA_COCKPIT:
+		var forward := vehicle_forward
 		var cockpit_anchor := _cockpit_socket_transform \
 				if _has_cockpit_socket else _target_transform
 		# Gear changes animate the drivetrain and chassis, not the driver's eye
@@ -184,18 +199,68 @@ func _desired_pose() -> Dictionary:
 				+ forward * COCKPIT_LOOK_DISTANCE \
 				- Vector3.UP * COCKPIT_LOOK_DISTANCE * COCKPIT_LOOK_DOWN_SLOPE
 		return {"position": cockpit_position, "look_at": cockpit_look}
+	var forward := _smoothed_chase_forward()
 	var chase_position := origin - forward * 7.5 + Vector3.UP * 2.85
 	if _has_chase_socket:
 		# The vehicle authors an exterior socket that already sits behind and above
 		# the rear wing. Treating it as merely another target and subtracting a
 		# second full chase distance pushed the car below frame as speed increased.
 		# Keep the socket authoritative with one constant mounting offset.
-		chase_position = _chase_socket_transform.origin \
+		# Recover the authored offset in car-local coordinates, then apply it in
+		# the eased grade frame. Yaw and car-origin translation remain immediate.
+		var socket_local := _target_transform.affine_inverse() \
+				* _chase_socket_transform.origin
+		chase_position = origin + _chase_basis(forward) * socket_local \
 				- forward * 0.10 + Vector3.UP * 0.16
 	# A fixed look offset preserves the same composition at every speed.
 	var chase_look := origin + forward * 1.65 \
 			+ Vector3.UP * 0.58
 	return {"position": chase_position, "look_at": chase_look}
+
+
+func _target_grade_pitch() -> float:
+	if not _has_target:
+		return 0.0
+	var forward := (_target_transform.basis * Vector3.RIGHT).normalized()
+	if forward.length_squared() < 0.5:
+		return 0.0
+	return asin(clampf(forward.y, -0.999, 0.999))
+
+
+func _advance_chase_grade(delta: float) -> void:
+	var target := _target_grade_pitch()
+	if not _has_smoothed_chase_pitch:
+		_smoothed_chase_pitch = target
+		_has_smoothed_chase_pitch = true
+		return
+	var safe_delta := clampf(delta, 0.0, 0.1)
+	var desired_step := angle_difference(_smoothed_chase_pitch, target) \
+			* _exponential_weight(CHASE_GRADE_RESPONSE, safe_delta)
+	var maximum_step := CHASE_MAX_GRADE_RATE_RADIANS * safe_delta
+	_smoothed_chase_pitch += clampf(desired_step, -maximum_step, maximum_step)
+
+
+func _smoothed_chase_forward() -> Vector3:
+	var target_forward := (_target_transform.basis * Vector3.RIGHT).normalized()
+	var horizontal := Vector3(target_forward.x, 0.0, target_forward.z)
+	if horizontal.length_squared() < 0.0001:
+		horizontal = Vector3.RIGHT
+	else:
+		horizontal = horizontal.normalized()
+	var pitch := _smoothed_chase_pitch if _has_smoothed_chase_pitch \
+			else _target_grade_pitch()
+	return (horizontal * cos(pitch) + Vector3.UP * sin(pitch)).normalized()
+
+
+static func _chase_basis(forward: Vector3) -> Basis:
+	var safe_forward := forward.normalized()
+	var lateral := safe_forward.cross(Vector3.UP)
+	if lateral.length_squared() < 0.0001:
+		lateral = Vector3.BACK
+	else:
+		lateral = lateral.normalized()
+	var local_up := lateral.cross(safe_forward).normalized()
+	return Basis(safe_forward, local_up, lateral).orthonormalized()
 
 
 func _desired_fov() -> float:

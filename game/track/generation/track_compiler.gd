@@ -83,6 +83,7 @@ static func compile(
 					"fairing_radius_samples": int(corner_recovery.get("fairing_radius_samples", 0)),
 					"fallback_method": str(corner_recovery.get("fallback_method", "")),
 					"fallback_harmonics": int(corner_recovery.get("fallback_harmonics", 0)),
+					"local_rounding_passes": int(corner_recovery.get("local_rounding_passes", 0)),
 					"source_sample_count": int(corner_recovery.get("source_sample_count", centerline.size())),
 					"output_sample_count": int(corner_recovery.get("output_sample_count", centerline.size())),
 				}
@@ -111,6 +112,7 @@ static func compile(
 	compiled.canvas_size = definition.canvas_size
 	compiled.direction = definition.direction
 	compiled.theme = definition.theme
+	compiled.road_surface = definition.road_surface
 	compiled.pit_side = definition.pit_side
 	compiled.decoration_density = definition.decoration_density
 	compiled.deterministic_seed = definition.deterministic_seed

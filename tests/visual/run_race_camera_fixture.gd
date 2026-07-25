@@ -5,6 +5,7 @@ extends SceneTree
 
 const RaceScreenType := preload("res://game/ui/screens/race_screen.gd")
 const AiRosterType := preload("res://game/ai/ai_roster.gd")
+const TrackCatalogType := preload("res://game/content/predefined_track_catalog.gd")
 
 const AUTODRIVE_SECONDS := 14.0
 const PROOF_INTERVAL_FRAMES := 120
@@ -35,6 +36,7 @@ func _build_fixture() -> void:
 	var performance_proof := false
 	var camera_stability_proof := false
 	var mobile_tier := false
+	var track_id := ""
 	for argument in OS.get_cmdline_user_args():
 		if argument == "--camera=cockpit":
 			requested = &"cockpit"
@@ -48,8 +50,17 @@ func _build_fixture() -> void:
 			camera_stability_proof = true
 		elif argument == "--mobile-tier":
 			mobile_tier = true
+		elif argument.begins_with("--track="):
+			track_id = argument.trim_prefix("--track=")
 	var screen := RaceScreenType.new()
-	screen.set_payload({"visual_fixture": true})
+	var race_payload := {"visual_fixture": true}
+	if not track_id.is_empty():
+		var record := TrackCatalogType.by_id(track_id)
+		var definition: TrackDefinition = record.get("definition")
+		if definition != null:
+			race_payload["track_definition_json"] = definition.canonical_json(true)
+			race_payload["display_name"] = str(record.get("name", track_id))
+	screen.set_payload(race_payload)
 	root.add_child(screen)
 	screen.size = Vector2(1280.0, 720.0)
 	await process_frame
@@ -138,9 +149,19 @@ func _run_autodrive(
 		player = screen.director.entry(screen.PLAYER_ID)
 		if player == null or player.state == null:
 			break
-		if performance_proof and frame >= PERFORMANCE_WARMUP_FRAMES:
-			_anchor_dense_non_overlapping_pack(screen, player)
 		var frame_started_usec := Time.get_ticks_usec()
+		if performance_proof and frame >= PERFORMANCE_WARMUP_FRAMES:
+			# Exercise every quantized coating transition during the first three
+			# measured seconds, then retain the fully muddy field for the remainder.
+			_set_surface_stress_progress(
+				screen,
+				clampf(
+					float(frame - PERFORMANCE_WARMUP_FRAMES) / 180.0,
+					0.0,
+					1.0
+				)
+			)
+			_anchor_dense_non_overlapping_pack(screen, player)
 		var decision_states: Array = []
 		for entry in screen.director.entries:
 			decision_states.append(entry.state.duplicate_state())
@@ -317,6 +338,17 @@ func _run_autodrive(
 		)
 	if performance_proof or camera_stability_proof:
 		quit(0 if performance_passed and camera_stability_passed else 1)
+
+
+func _set_surface_stress_progress(screen: Control, progress: float) -> void:
+	if screen == null or screen.perspective_view == null \
+			or screen.race_query == null \
+			or str(screen.race_query.road_surface) != "mud":
+		return
+	for visual in screen.perspective_view._vehicles.values():
+		if visual != null and is_instance_valid(visual) \
+				and visual.has_method("set_surface_lap_progress"):
+			visual.call("set_surface_lap_progress", progress)
 
 
 func _anchor_dense_non_overlapping_pack(

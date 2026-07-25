@@ -10,10 +10,11 @@ const TrackValidatorType := preload("res://game/track/validation/track_validator
 const BridgeDefinitionType := preload("res://game/track/definition/bridge_crossing_definition.gd")
 const WorldPlannerType := preload("res://game/track/features/track_world_feature_planner.gd")
 const RaceTrackQueryType := preload("res://game/race/track_query.gd")
-const AUTHORING_HELP_TEXT := "Draw one closed loop in any corner style. Sharp turns are rounded automatically; every small-gap fix is shown before you accept it."
+const RoadSurfaceCatalogType := preload("res://game/content/road_surface_catalog.gd")
+const AUTHORING_HELP_TEXT := "Draw one closed loop in any corner style. Extreme points are rounded automatically with only a small correction before the circuit builds."
 # Persistence and compiler authority must never depend on the physical size of
 # the phone or desktop canvas that happened to capture the normalized stroke.
-const AUTHORING_AUTHORITY_CANVAS_SIZE := Vector2(1280.0, 720.0)
+const AUTHORING_AUTHORITY_CANVAS_SIZE := Vector2(2200.0, 1240.0)
 
 var canvas: TrackCanvas
 var status_label: Label
@@ -27,6 +28,8 @@ var editing_definition: TrackDefinition
 var name_field: LineEdit
 var length_option: OptionButton
 var width_option: OptionButton
+var surface_option: OptionButton
+var surface_description: Label
 var direction_option: OptionButton
 var pit_option: OptionButton
 var density_slider: HSlider
@@ -37,10 +40,6 @@ var _mode_tabs: TabBar
 var _tabs: TabContainer
 var _clear_button: Button
 var _demo_button: Button
-var _start_fix_panel: PanelContainer
-var _start_fix_label: Label
-var _pending_start_fix_definition: TrackDefinition
-var _pending_start_fix_distance := 0.0
 # Integration seam for an isolated in-memory profile service. Production uses
 # the GameServices autoload; tests can prove the complete BUILD CIRCUIT flow
 # without touching the player's real save data.
@@ -141,13 +140,14 @@ func _build() -> void:
 	_mode_tabs.custom_minimum_size.y = 48.0
 	_mode_tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_mode_tabs.add_theme_font_size_override("font_size", 14)
-	_mode_tabs.add_tab("DRAW")
-	_mode_tabs.add_tab("WORLD")
+	_mode_tabs.add_tab("DRAW TRACK")
+	_mode_tabs.add_tab("WORLD & ROAD")
 	_mode_tabs.tab_changed.connect(_on_inspector_mode_changed)
 	tools.add_child(_mode_tabs)
 	_tabs = TabContainer.new()
 	_tabs.name = "InspectorTabs"
 	_tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_tabs.clip_contents = true
 	_tabs.tabs_visible = false
 	_tabs.tab_changed.connect(_on_inspector_content_changed)
 	tools.add_child(_tabs)
@@ -156,6 +156,7 @@ func _build() -> void:
 	draw_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	draw_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	draw_scroll.follow_focus = true
+	draw_scroll.clip_contents = true
 	_tabs.add_child(draw_scroll)
 	var draw_tab := VBoxContainer.new()
 	draw_tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -211,11 +212,31 @@ func _build() -> void:
 	world_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	world_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	world_scroll.follow_focus = true
+	world_scroll.clip_contents = true
 	_tabs.add_child(world_scroll)
 	var world := VBoxContainer.new()
 	world.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	world.add_theme_constant_override("separation", 8)
 	world_scroll.add_child(world)
+	var world_heading := DesignSystem.label("WORLD & ROAD", 16, DesignSystem.MINT)
+	world.add_child(world_heading)
+	var world_help := DesignSystem.label(
+		"Choose the road surface, circuit scale, direction, pits, scenery, and crossing bridges here.",
+		13,
+		DesignSystem.MUTED
+	)
+	world_help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	world.add_child(world_help)
+	surface_option = _option_row(
+		world, "SURFACE", RoadSurfaceCatalogType.selection_labels(true), 0
+	)
+	surface_option.tooltip_text = "Surface changes grip, braking, rolling drag, texture, and suspension movement."
+	surface_option.item_selected.connect(_on_surface_selected)
+	surface_description = DesignSystem.label("", 12, DesignSystem.MUTED)
+	surface_description.name = "SurfaceDescription"
+	surface_description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	world.add_child(surface_description)
+	_on_surface_selected(surface_option.selected)
 	name_field = LineEdit.new()
 	name_field.text = "My Circuit"
 	name_field.max_length = 80
@@ -241,10 +262,11 @@ func _build() -> void:
 	density_row.add_child(density_label)
 	world.add_child(density_row)
 	bridge_toggle = CheckButton.new()
-	bridge_toggle.text = "BUILD SAFE BRIDGES AT CROSSINGS"
+	bridge_toggle.text = "AUTO SAFE BRIDGES AT CROSSINGS"
 	bridge_toggle.button_pressed = true
+	bridge_toggle.disabled = true
 	bridge_toggle.custom_minimum_size.y = 48.0
-	bridge_toggle.tooltip_text = "Every intentional self-crossing is declared and assigned one elevated branch."
+	bridge_toggle.tooltip_text = "Every detected self-crossing is automatically assigned one safe elevated branch."
 	world.add_child(bridge_toggle)
 	var theme_note := DesignSystem.label("THEME  •  SUNLIT FOREST", 13, DesignSystem.MINT)
 	world.add_child(theme_note)
@@ -252,29 +274,6 @@ func _build() -> void:
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status_label.custom_minimum_size.y = 50.0
 	tools.add_child(status_label)
-	_start_fix_panel = PanelContainer.new()
-	_start_fix_panel.visible = false
-	_start_fix_panel.add_theme_stylebox_override("panel", DesignSystem.panel_style(Color(0.12, 0.095, 0.045, 0.98), 16, DesignSystem.GOLD, 2))
-	tools.add_child(_start_fix_panel)
-	var start_fix_content := VBoxContainer.new()
-	start_fix_content.add_theme_constant_override("separation", 7)
-	_start_fix_panel.add_child(start_fix_content)
-	_start_fix_label = DesignSystem.label("", 13, DesignSystem.WHITE)
-	_start_fix_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	start_fix_content.add_child(_start_fix_label)
-	var start_fix_actions := HBoxContainer.new()
-	start_fix_actions.add_theme_constant_override("separation", 8)
-	start_fix_content.add_child(start_fix_actions)
-	var accept_start_fix := DesignSystem.button("MOVE GRID HERE", true, true)
-	accept_start_fix.custom_minimum_size = Vector2(100.0, 48.0)
-	accept_start_fix.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	accept_start_fix.pressed.connect(_accept_start_fix)
-	start_fix_actions.add_child(accept_start_fix)
-	var reject_start_fix := DesignSystem.button("KEEP EDITING", false, true)
-	reject_start_fix.custom_minimum_size = Vector2(100.0, 48.0)
-	reject_start_fix.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	reject_start_fix.pressed.connect(_cancel_start_fix)
-	start_fix_actions.add_child(reject_start_fix)
 	confirm_button = DesignSystem.button("BUILD CIRCUIT  ›", true)
 	confirm_button.name = "BuildCircuit"
 	confirm_button.custom_minimum_size.x = 0.0
@@ -316,6 +315,14 @@ func _on_inspector_content_changed(tab_index: int) -> void:
 		_mode_tabs.current_tab = tab_index
 
 
+func _on_surface_selected(index: int) -> void:
+	if surface_description == null:
+		return
+	var style := RoadSurfaceCatalogType.style_at_index(index)
+	var profile := RoadSurfaceCatalogType.profile(style)
+	surface_description.text = str(profile.get("description", ""))
+
+
 func _sync_editing_controls() -> void:
 	if editing_definition == null:
 		return
@@ -329,6 +336,10 @@ func _sync_editing_controls() -> void:
 			closest_difference = difference
 			closest_width = index
 	width_option.select(closest_width)
+	surface_option.select(RoadSurfaceCatalogType.style_index(
+		editing_definition.road_surface
+	))
+	_on_surface_selected(surface_option.selected)
 	direction_option.select(1 if editing_definition.direction == TrackDefinitionType.DIRECTION_COUNTER_CLOCKWISE else 0)
 	pit_option.select(["none", "left", "right"].find(str(editing_definition.pit_side)))
 	density_slider.value = editing_definition.decoration_density
@@ -341,8 +352,6 @@ func _sync_editing_controls() -> void:
 	length_option.select(0 if ratio < 0.9 else (2 if ratio > 1.12 else 1))
 
 func _on_track_changed(point_count: int, is_closed: bool) -> void:
-	if _pending_start_fix_definition != null:
-		_clear_start_fix_review(false)
 	var seam_needs_acceptance := canvas.will_snap_close()
 	if not is_closed or seam_needs_acceptance:
 		_auto_close_accepted = false
@@ -383,10 +392,6 @@ static func inherit_edit_identity(definition: TrackDefinition, previous: TrackDe
 	definition.start_finish_distance = previous.start_finish_distance
 
 
-static func proposal_preview_distance(current_distance: float, proposed_distance: float) -> float:
-	return proposed_distance - current_distance
-
-
 static func authority_canvas_size_for(previous: TrackDefinition = null) -> Vector2:
 	if previous != null and QuantizationType.is_finite_vector2(previous.canvas_size) \
 			and previous.canvas_size.x > 0.0 and previous.canvas_size.y > 0.0:
@@ -421,8 +426,8 @@ static func create_authority_definition(
 	)
 	definition.target_length = QuantizationType.scalar(clampf(
 		logical_loop_length(loop, authority_size) * length_scale,
-		900.0,
-		3000.0
+		1800.0,
+		5200.0
 	))
 	definition.refresh_content_hash()
 	return definition
@@ -448,6 +453,9 @@ func _confirm_track() -> void:
 	definition.direction = TrackDefinitionType.DIRECTION_COUNTER_CLOCKWISE if direction_option.selected == 1 else TrackDefinitionType.DIRECTION_CLOCKWISE
 	definition.pit_side = [TrackDefinitionType.PIT_NONE, TrackDefinitionType.PIT_LEFT, TrackDefinitionType.PIT_RIGHT][pit_option.selected]
 	definition.theme = &"forest"
+	definition.road_surface = RoadSurfaceCatalogType.style_at_index(
+		surface_option.selected
+	)
 	var timestamp := int(Time.get_unix_time_from_system())
 	definition.created_at_timestamp = timestamp
 	definition.updated_at_timestamp = timestamp
@@ -459,22 +467,17 @@ func _confirm_track() -> void:
 		definition.track_id = ""
 		definition.track_id = definition.derived_track_id()
 	var result := _compile_with_declared_bridges(definition)
-	# A finger-drawn seam rarely lands on a full grid straight. Never move the
-	# authored grid silently: preview the exact deterministic proposal and wait
-	# for an explicit acceptance.
-	if result.track != null and result.report.has_code(&"geometry.start_straight_too_short"):
-		_begin_start_fix_review(definition, result)
-		return
+	result = _automatically_place_grid(definition, result)
 	_finalize_track(definition, result)
 
 
 func _compile_with_declared_bridges(definition: TrackDefinition) -> TrackCompileResult:
-	# Crossings are never guessed silently: the WORLD toggle is the explicit
-	# player choice to declare every detected branch pair as a safe bridge.
+	# Every clean self-crossing is resolved automatically. A drawn figure-eight
+	# must build directly without asking the player to diagnose topology.
 	definition.bridge_crossings.clear()
 	definition.refresh_content_hash()
 	var result: TrackCompileResult = TrackCompilerType.compile(definition)
-	if result.track == null or not bridge_toggle.button_pressed:
+	if result.track == null:
 		return result
 	var crossings := TrackValidatorType.find_crossings(result.track)
 	for crossing_index in crossings.size():
@@ -491,67 +494,29 @@ func _compile_with_declared_bridges(definition: TrackDefinition) -> TrackCompile
 	return result
 
 
-func _begin_start_fix_review(definition: TrackDefinition, result: TrackCompileResult) -> void:
-	_pending_start_fix_definition = definition.copy()
-	_pending_start_fix_distance = result.track.suggested_start_finish_distance
-	var query := RaceTrackQueryType.from_compiled(result.track)
-	# Compiled route distance zero is the authored gate because the compiler has
-	# already rotated its samples by definition.start_finish_distance. Convert
-	# the absolute proposal back into this preview's route-relative distance.
-	var current_sample := query.sample_at_distance(0.0)
-	var proposed_sample := query.sample_at_distance(
-		proposal_preview_distance(definition.start_finish_distance, _pending_start_fix_distance)
-	)
-	if current_sample.is_empty() or proposed_sample.is_empty():
-		_pending_start_fix_definition = null
-		confirm_button.disabled = false
-		_on_status("The proposed grid position could not be previewed safely. Adjust the line and try again.", true)
-		_play_sfx(&"error")
-		return
-	canvas.show_start_fix_preview(
-		current_sample.get("position", Vector2.ZERO),
-		proposed_sample.get("position", Vector2.ZERO)
-	)
-	_start_fix_label.text = "GRID POSITION REVIEW\nCoral is your current gate. Mint is the nearest safe 12-car straight. The road shape will not change."
-	_start_fix_panel.visible = true
-	_set_authoring_enabled(false)
-	_on_status("Review the coral-to-mint grid move, then accept it or keep editing.", false)
-	_play_sfx(&"click")
-
-
-func _accept_start_fix() -> void:
-	if _pending_start_fix_definition == null:
-		return
-	var definition := _pending_start_fix_definition
-	definition.start_finish_distance = QuantizationType.scalar(_pending_start_fix_distance)
-	_clear_start_fix_review(false)
-	var result := _compile_with_declared_bridges(definition)
-	if result.track != null and result.report.has_code(&"geometry.start_straight_too_short"):
-		_set_authoring_enabled(true)
-		_on_status("That grid proposal is no longer safe. Adjust the loop and validate again.", true)
-		_play_sfx(&"error")
-		return
-	_play_sfx(&"confirm")
-	_vibrate_feedback(35, 0.25)
-	_finalize_track(definition, result)
-
-
-func _cancel_start_fix() -> void:
-	if _pending_start_fix_definition == null:
-		return
-	_clear_start_fix_review(true)
-	_on_status("Grid move cancelled. Adjust the start area or validate again when ready.", false)
-
-
-func _clear_start_fix_review(reenable: bool) -> void:
-	_pending_start_fix_definition = null
-	_pending_start_fix_distance = 0.0
-	if _start_fix_panel != null:
-		_start_fix_panel.visible = false
-	if canvas != null:
-		canvas.clear_start_fix_preview()
-	if reenable:
-		_set_authoring_enabled(true)
+func _automatically_place_grid(
+		definition: TrackDefinition,
+		initial_result: TrackCompileResult
+	) -> TrackCompileResult:
+	var result := initial_result
+	# Finger-drawn loops rarely begin on their best straight. Apply the compiler's
+	# deterministic proposal immediately and re-evaluate a few times because the
+	# light corner-rounding pass can shift the optimum by one sample. If a highly
+	# unusual circuit has no full-length straight, validation records a warning
+	# and the safest available position still builds—there is no stale review UI.
+	for _attempt in 4:
+		if result.track == null \
+				or not result.report.has_code(&"geometry.start_straight_too_short"):
+			break
+		var proposal := QuantizationType.scalar(
+			result.track.suggested_start_finish_distance
+		)
+		if absf(proposal - definition.start_finish_distance) <= 0.0001:
+			break
+		definition.start_finish_distance = proposal
+		definition.refresh_content_hash()
+		result = _compile_with_declared_bridges(definition)
+	return result
 
 
 func _set_authoring_enabled(enabled: bool) -> void:
@@ -561,10 +526,11 @@ func _set_authoring_enabled(enabled: bool) -> void:
 	name_field.editable = enabled
 	length_option.disabled = not enabled
 	width_option.disabled = not enabled
+	surface_option.disabled = not enabled
 	direction_option.disabled = not enabled
 	pit_option.disabled = not enabled
 	density_slider.editable = enabled
-	bridge_toggle.disabled = not enabled
+	bridge_toggle.disabled = true
 	_clear_button.disabled = not enabled
 	_demo_button.disabled = not enabled
 	for tab_index in _tabs.get_tab_count():

@@ -109,13 +109,14 @@ static func find_crossings(compiled: CompiledTrack) -> Array[Dictionary]:
 		var max_cell := Vector2i(floori(maximum.x / cell_size), floori(maximum.y / cell_size))
 		for cell_x in range(min_cell.x, max_cell.x + 1):
 			for cell_y in range(min_cell.y, max_cell.y + 1):
-				var cell_key := "%d:%d" % [cell_x, cell_y]
+				var cell_key := Vector2i(cell_x, cell_y)
 				var bucket: Array = buckets.get(cell_key, [])
 				for segment_b_variant in bucket:
 					var segment_b := int(segment_b_variant)
 					if _segments_are_adjacent(segment_a, segment_b, count):
 						continue
-					var pair_key := "%d:%d" % [mini(segment_a, segment_b), maxi(segment_a, segment_b)]
+					var pair_key := mini(segment_a, segment_b) * count \
+							+ maxi(segment_a, segment_b)
 					if checked_pairs.has(pair_key):
 						continue
 					checked_pairs[pair_key] = true
@@ -163,13 +164,14 @@ static func find_surface_overlaps(
 		var max_cell := Vector2i(floori(maximum.x / cell_size), floori(maximum.y / cell_size))
 		for cell_x in range(min_cell.x, max_cell.x + 1):
 			for cell_y in range(min_cell.y, max_cell.y + 1):
-				var cell_key := "%d:%d" % [cell_x, cell_y]
+				var cell_key := Vector2i(cell_x, cell_y)
 				var bucket: Array = buckets.get(cell_key, [])
 				for segment_b_variant in bucket:
 					var segment_b := int(segment_b_variant)
 					if _segments_are_nearby_on_lap(segment_a, segment_b, count, local_neighbor_count):
 						continue
-					var pair_key := "%d:%d" % [mini(segment_a, segment_b), maxi(segment_a, segment_b)]
+					var pair_key := mini(segment_a, segment_b) * count \
+							+ maxi(segment_a, segment_b)
 					if checked_pairs.has(pair_key):
 						continue
 					checked_pairs[pair_key] = true
@@ -321,7 +323,11 @@ static func _validate_start_and_pit(
 	var straight_length := _straight_length_from_start(compiled)
 	var length_epsilon := maxf(0.001, compiled.sample_spacing * 0.0001)
 	if straight_length + length_epsilon < GameLimitsType.START_STRAIGHT_LENGTH:
-		report.add_error(&"geometry.start_straight_too_short", "Start/finish grid is not on a sufficiently straight section.", "start_finish_distance", {"actual": straight_length, "required": GameLimitsType.START_STRAIGHT_LENGTH, "suggested_distance": compiled.suggested_start_finish_distance})
+		# Track Studio deterministically moves the gate to the best available
+		# section. Very unusual all-corner circuits may still have no full 96-unit
+		# straight; they remain playable with a compact curved grid and must not be
+		# trapped behind a manual review/error page.
+		report.add_warning(&"geometry.start_straight_too_short", "The grid uses the safest available section of this highly curved circuit.", "start_finish_distance", {"actual": straight_length, "required": GameLimitsType.START_STRAIGHT_LENGTH, "suggested_distance": compiled.suggested_start_finish_distance})
 	if definition.pit_side != TrackDefinition.PIT_NONE:
 		var best_length := float(_best_straight(compiled).get("length", 0.0))
 		if best_length + length_epsilon < GameLimitsType.PIT_STRAIGHT_LENGTH:

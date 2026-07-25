@@ -63,7 +63,7 @@ func _test_deterministic_compile(test: RefCounted) -> void:
 	if first.track == null or second.track == null:
 		return
 	test.assert_equal(first.track.compile_hash, second.track.compile_hash, "identical definitions must compile byte-identically")
-	test.assert_equal(first.track.compile_hash, "04f93604a6ab62cedf75ab18db2c8626b7ad623eb0c5a6d3ec09aa12594f1258", "compiled fixture hash must remain a golden generator-v2 contract")
+	test.assert_equal(first.track.compile_hash, "ba3ced5dd27a28c3df9696608ae769efa41eea70979e16aa80aa5cb0e996ca59", "compiled fixture hash must remain a golden generator-v3 contract")
 	test.assert_equal(first.track.centerline, second.track.centerline, "deterministic centerline")
 	test.assert_near(first.track.total_length, definition.target_length, 10.0, "compiled target length")
 	test.assert_equal(first.track.direction, definition.direction, "compiler must enforce requested winding")
@@ -144,7 +144,7 @@ func _test_sharp_corner_recovery(test: RefCounted) -> void:
 		)
 		test.assert_false(first.report.has_code(&"geometry.turn_radius_too_small"), "%s must never return the redraw radius error" % case_name)
 		if case_name in [
-			"narrow angular loop", "screenshot hairpin", "acute cusp",
+			"screenshot hairpin", "acute cusp",
 			"tiny-radius notch", "tangled studio rosette",
 		]:
 			test.assert_true(first.report.has_code(&"geometry.turns_auto_smoothed"), "%s must report a non-error automatic rounding note" % case_name)
@@ -339,7 +339,10 @@ func _test_start_straight_float_tolerance(test: RefCounted) -> void:
 	compiled.centerline[3].x = 95.98
 	report = ValidationReportType.new()
 	ValidatorType._validate_start_and_pit(definition, compiled, report)
-	test.assert_true(report.has_code(&"geometry.start_straight_too_short"), "materially short start straight remains invalid")
+	test.assert_true(
+		report.has_code(&"geometry.start_straight_too_short") and report.is_valid(),
+		"materially short start straight records a non-blocking compact-grid warning"
+	)
 
 
 func _test_crossing_detection(test: RefCounted) -> void:

@@ -7,6 +7,7 @@ const BridgeDefinitionType := preload("res://game/track/definition/bridge_crossi
 const TrackCompilerType := preload("res://game/track/generation/track_compiler.gd")
 const TrackValidatorType := preload("res://game/track/validation/track_validator.gd")
 const QuantizationType := preload("res://game/core/quantization.gd")
+const RoadSurfaceCatalogType := preload("res://game/content/road_surface_catalog.gd")
 
 const CONTENT_TIMESTAMP := 1_784_820_000
 
@@ -25,6 +26,7 @@ static func records() -> Array[Dictionary]:
 			"description": "A welcoming three-lobed forest circuit whose broad opposing sweepers introduce unusual lines without punishing new drivers.",
 			"difficulty": 1,
 			"archetype": "asymmetric-trident",
+			"road_surface": RoadSurfaceCatalogType.SMOOTH_ASPHALT,
 			"accent": Color("5fffd0"),
 			"target_length": 4000.0,
 			"width": 48.0,
@@ -41,6 +43,7 @@ static func records() -> Array[Dictionary]:
 			"description": "A lakefront crescent wraps around a central hammerhead, mixing open sweepers with a deceptive double-apex return.",
 			"difficulty": 2,
 			"archetype": "crescent-hammerhead",
+			"road_surface": RoadSurfaceCatalogType.WEATHERED_ASPHALT,
 			"accent": Color("51c8ff"),
 			"target_length": 4200.0,
 			"width": 46.0,
@@ -64,6 +67,7 @@ static func records() -> Array[Dictionary]:
 			"description": "Five flowing ridge crests form a crown-shaped rhythm where every approach changes the next braking line.",
 			"difficulty": 3,
 			"archetype": "five-lobe-crown",
+			"road_surface": RoadSurfaceCatalogType.BUMPY_ASPHALT,
 			"accent": Color("b99cff"),
 			"target_length": 4300.0,
 			"width": 46.0,
@@ -80,6 +84,7 @@ static func records() -> Array[Dictionary]:
 			"description": "Two opposing river bends interlock without crossing, ending in a tightening hook beside the pit straight.",
 			"difficulty": 3,
 			"archetype": "interlocking-river-knot",
+			"road_surface": RoadSurfaceCatalogType.MUD,
 			"accent": Color("ffc857"),
 			"target_length": 4100.0,
 			"width": 47.0,
@@ -103,6 +108,7 @@ static func records() -> Array[Dictionary]:
 			"description": "A flowing figure-eight whose sunlit overpass separates two high-speed forest approaches.",
 			"difficulty": 4,
 			"archetype": "elevated-figure-eight",
+			"road_surface": RoadSurfaceCatalogType.SMOOTH_ASPHALT,
 			"accent": Color("62f5e2"),
 			"target_length": 4600.0,
 			"width": 46.0,
@@ -121,6 +127,7 @@ static func records() -> Array[Dictionary]:
 			"description": "Seven canyon apexes spiral through alternating cambers; the narrow road rewards deliberate placement.",
 			"difficulty": 4,
 			"archetype": "seven-apex-rosette",
+			"road_surface": RoadSurfaceCatalogType.COMPACT_GRAVEL,
 			"accent": Color("ff6b72"),
 			"target_length": 4400.0,
 			"width": 44.0,
@@ -189,6 +196,9 @@ static func _definition_from_record(record: Dictionary) -> TrackDefinition:
 	definition.direction = StringName(str(record.get("direction", TrackDefinitionType.DIRECTION_CLOCKWISE)))
 	definition.target_length = QuantizationType.scalar(float(record["target_length"]))
 	definition.theme = &"forest"
+	definition.road_surface = RoadSurfaceCatalogType.sanitized_style(
+		StringName(str(record.get("road_surface", RoadSurfaceCatalogType.SMOOTH_ASPHALT)))
+	)
 	definition.pit_side = StringName(str(record["pit_side"]))
 	definition.decoration_density = QuantizationType.scalar(float(record["density"]), 0.000001)
 	definition.created_at_timestamp = CONTENT_TIMESTAMP

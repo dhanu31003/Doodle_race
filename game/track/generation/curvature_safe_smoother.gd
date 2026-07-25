@@ -14,6 +14,8 @@ const BOX_BLUR_PASSES := 3
 const MAX_RECOVERY_SAMPLES := GameLimitsType.MAX_RESAMPLED_POINTS
 const INTERACTIVE_RECOVERY_SAMPLES := 1024
 const SAMPLES_PER_REQUIRED_RADIUS := 24.0
+const LOCAL_ROUNDING_MAX_PASSES := 28
+const LOCAL_ROUNDING_BLEND := 0.38
 
 
 static func round_to_minimum_radius(
@@ -36,6 +38,7 @@ static func round_to_minimum_radius(
 		"fairing_radius_samples": 0,
 		"fallback_method": "",
 		"fallback_harmonics": 0,
+		"local_rounding_passes": 0,
 		"source_sample_count": input.size(),
 		"output_sample_count": input.size(),
 	}
@@ -56,7 +59,7 @@ static func round_to_minimum_radius(
 		target_length * SAMPLES_PER_REQUIRED_RADIUS / maxf(minimum_radius, 1.0)
 	)
 	var minimum_by_spacing := ceili(target_length / GameLimitsType.MAX_SAMPLE_SPACING)
-	var desired_recovery_count := input.size()
+	var desired_recovery_count := mini(input.size(), INTERACTIVE_RECOVERY_SAMPLES)
 	if maximum_by_radius < input.size():
 		desired_recovery_count = mini(maximum_by_radius, INTERACTIVE_RECOVERY_SAMPLES)
 	var minimum_recovery_count := mini(
@@ -78,6 +81,34 @@ static func round_to_minimum_radius(
 		Vector2.ONE * track_width * 0.5,
 		canvas_size - Vector2.ONE * track_width
 	)
+	# First touch only samples that actually violate the radius envelope. This is
+	# the visual contract expected by freehand authoring: a needle point becomes
+	# a short curve, while long straights, switchbacks, and unusual large-scale
+	# silhouettes remain exactly where the player drew them.
+	var local_recovery := _locally_round_sharp_samples(
+		base_points, target_length, required, safe_rect, input[0], track_width
+	)
+	var evaluations := int(local_recovery.get("candidate_evaluations", 0))
+	if bool(local_recovery.get("succeeded", false)):
+		var local_points: PackedVector2Array = local_recovery.get(
+			"points", PackedVector2Array()
+		)
+		return {
+			"points": local_points,
+			"adjusted": true,
+			"succeeded": true,
+			"passes": int(local_recovery.get("passes", 0)),
+			"minimum_before": minimum_before,
+			"minimum_after": float(local_recovery.get("minimum_after", 0.0)),
+			"maximum_displacement": _maximum_index_displacement(input, local_points),
+			"candidate_evaluations": evaluations,
+			"fairing_radius_samples": 1,
+			"fallback_method": "local_corner_rounding",
+			"fallback_harmonics": 0,
+			"local_rounding_passes": int(local_recovery.get("passes", 0)),
+			"source_sample_count": input.size(),
+			"output_sample_count": local_points.size(),
+		}
 	# Three cyclic box filters approximate a Gaussian fairing kernel. Searching
 	# its radius exponentially then by bisection gives the same scale of corner
 	# rounding that formerly required thousands of normalize/resample/analyze
@@ -86,7 +117,6 @@ static func round_to_minimum_radius(
 	var lower_unsafe_radius := 0
 	var upper_safe_radius := -1
 	var best: Dictionary = {}
-	var evaluations := 0
 	var recovery_spacing := target_length / float(base_points.size())
 	var probe_radius := clampi(
 		ceili(required / maxf(recovery_spacing, GameLimitsType.GEOMETRY_EPSILON)),
@@ -137,6 +167,7 @@ static func round_to_minimum_radius(
 			"fairing_radius_samples": upper_safe_radius,
 			"fallback_method": "",
 			"fallback_harmonics": 0,
+			"local_rounding_passes": 0,
 			"source_sample_count": input.size(),
 			"output_sample_count": points.size(),
 		}
@@ -189,6 +220,7 @@ static func round_to_minimum_radius(
 			"fairing_radius_samples": 0,
 			"fallback_method": "harmonic_projection",
 			"fallback_harmonics": int(fallback.get("harmonics", 0)),
+			"local_rounding_passes": 0,
 			"source_sample_count": input.size(),
 			"output_sample_count": fallback_points.size(),
 		}
@@ -203,6 +235,96 @@ static func round_to_minimum_radius(
 	# compiler treats succeeded=false as a hard recovery failure, so neither the
 	# original sharp route nor a half-recovered route can leak into race data.
 	return unchanged
+
+
+static func _locally_round_sharp_samples(
+		base_points: PackedVector2Array,
+		target_length: float,
+		required_radius: float,
+		safe_rect: Rect2,
+		seam_anchor: Vector2,
+		track_width: float
+	) -> Dictionary:
+	var points := base_points.duplicate()
+	var evaluations := 0
+	for pass_index in LOCAL_ROUNDING_MAX_PASSES:
+		var count := points.size()
+		var severity := PackedFloat32Array()
+		severity.resize(count)
+		var unsafe_count := 0
+		for index in count:
+			var radius := _radius_at_index(points, index)
+			if radius < required_radius:
+				severity[index] = clampf(
+					(required_radius - radius) / maxf(required_radius, 0.001),
+					0.0, 1.0
+				)
+				unsafe_count += 1
+		if unsafe_count == 0:
+			break
+		var rounded := points.duplicate()
+		for index in count:
+			# Spread one sample beyond the failing vertex so a pointed tip becomes
+			# a short arc instead of transferring its kink to the next sample.
+			var influence := maxf(
+				severity[index],
+				maxf(
+					severity[(index - 1 + count) % count] * 0.45,
+					severity[(index + 1) % count] * 0.45
+				)
+			)
+			if influence <= 0.0:
+				continue
+			var midpoint := (
+				points[(index - 1 + count) % count]
+				+ points[(index + 1) % count]
+			) * 0.5
+			rounded[index] = QuantizationType.vector2(
+				points[index].lerp(
+					midpoint,
+					LOCAL_ROUNDING_BLEND * (0.35 + influence * 0.65)
+				)
+			)
+		points = _normalize_route(rounded, target_length)
+		if points.is_empty():
+			return {"succeeded": false, "candidate_evaluations": evaluations}
+		points = _anchor_or_fit_inside(points, seam_anchor, safe_rect)
+		if points.is_empty():
+			return {"succeeded": false, "candidate_evaluations": evaluations}
+		evaluations += 1
+		var minimum_after := _minimum_radius(points)
+		if minimum_after >= required_radius:
+			return {
+				"points": points,
+				"succeeded": true,
+				"passes": pass_index + 1,
+				"minimum_after": minimum_after,
+				"candidate_evaluations": evaluations,
+			}
+	return {
+		"succeeded": false,
+		"candidate_evaluations": evaluations,
+		"minimum_after": _minimum_radius(points),
+	}
+
+
+static func _radius_at_index(points: PackedVector2Array, index: int) -> float:
+	var count := points.size()
+	var previous := points[(index - 1 + count) % count]
+	var current := points[index]
+	var next := points[(index + 1) % count]
+	var incoming := current - previous
+	var outgoing := next - current
+	var local_length := 0.5 * (incoming.length() + outgoing.length())
+	if local_length <= GameLimitsType.GEOMETRY_EPSILON:
+		return 0.0
+	var signed_turn := atan2(
+		incoming.x * outgoing.y - incoming.y * outgoing.x,
+		incoming.dot(outgoing)
+	)
+	var curvature := signed_turn / local_length
+	return INF if absf(curvature) <= GameLimitsType.STRAIGHT_CURVATURE_EPSILON \
+			else 1.0 / absf(curvature)
 
 
 static func _harmonic_safe_fallback(

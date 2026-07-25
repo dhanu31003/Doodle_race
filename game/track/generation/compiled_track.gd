@@ -13,6 +13,7 @@ var track_id: String = ""
 var canvas_size: Vector2 = Vector2.ZERO
 var direction: StringName = &"clockwise"
 var theme: StringName = &"classic"
+var road_surface: StringName = &"smooth_asphalt"
 var pit_side: StringName = &"none"
 var decoration_density: float = 0.0
 var deterministic_seed: int = 0
@@ -55,6 +56,7 @@ func to_canonical_dictionary() -> Dictionary:
 		"canvas_size_q": _vectors_to_fixed(PackedVector2Array([canvas_size])),
 		"direction": str(direction),
 		"theme": str(theme),
+		"road_surface": str(road_surface),
 		"pit_side": str(pit_side),
 		"decoration_density_q": QuantizationType.to_fixed(decoration_density, 1_000_000),
 		"deterministic_seed": deterministic_seed,

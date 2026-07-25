@@ -22,8 +22,6 @@ var drawing := false
 var pointer_id := -1
 var accent := DesignSystem.MINT
 var input_limit_reached := false
-var _start_fix_current := Vector2(-1.0, -1.0)
-var _start_fix_proposed := Vector2(-1.0, -1.0)
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -222,25 +220,6 @@ func load_normalized_loop(source: PackedVector2Array) -> void:
 	queue_redraw()
 
 
-func show_start_fix_preview(current_position: Vector2, proposed_position: Vector2) -> void:
-	if not _finite_vector(current_position) or not _finite_vector(proposed_position):
-		clear_start_fix_preview()
-		return
-	_start_fix_current = current_position
-	_start_fix_proposed = proposed_position
-	queue_redraw()
-
-
-func clear_start_fix_preview() -> void:
-	_start_fix_current = Vector2(-1.0, -1.0)
-	_start_fix_proposed = Vector2(-1.0, -1.0)
-	queue_redraw()
-
-
-func has_start_fix_preview() -> bool:
-	return _finite_vector(_start_fix_current) and _finite_vector(_start_fix_proposed) \
-		and _start_fix_current.x >= 0.0 and _start_fix_proposed.x >= 0.0
-
 func _push_undo() -> void:
 	undo_stack.append(points.duplicate())
 	if undo_stack.size() > 20:
@@ -312,7 +291,7 @@ func _draw() -> void:
 		draw_polyline(draw_points, Color(0.0, 0.0, 0.0, 0.42), 20.0, true)
 		draw_polyline(draw_points, Color(0.31, 0.78, 1.0, 0.20), 12.0, true)
 		draw_polyline(draw_points, accent, 4.0, true)
-	var gate_color := DesignSystem.CORAL if has_start_fix_preview() else (DesignSystem.MINT if is_loop_closed() else DesignSystem.GOLD)
+	var gate_color := DesignSystem.MINT if is_loop_closed() else DesignSystem.GOLD
 	draw_circle(draw_points[0], CLOSURE_RADIUS, Color(gate_color, 0.08), true)
 	draw_arc(draw_points[0], CLOSURE_RADIUS, 0.0, TAU, 48, Color(gate_color, 0.8), 3.0, true)
 	draw_circle(draw_points[0], 7.0, gate_color, true)
@@ -334,32 +313,3 @@ func _draw() -> void:
 					4.0,
 					true
 				)
-	if has_start_fix_preview():
-		_draw_start_fix_preview()
-
-
-func _draw_start_fix_preview() -> void:
-	var current := _start_fix_current.clamp(Vector2.ZERO, size)
-	var proposed := _start_fix_proposed.clamp(Vector2.ZERO, size)
-	var distance := current.distance_to(proposed)
-	var dash_count := maxi(2, ceili(distance / 16.0))
-	for dash_index in dash_count:
-		if dash_index % 2 == 0:
-			var from_weight := float(dash_index) / float(dash_count)
-			var to_weight := float(dash_index + 1) / float(dash_count)
-			draw_line(
-				current.lerp(proposed, from_weight),
-				current.lerp(proposed, to_weight),
-				DesignSystem.GOLD,
-				3.0,
-				true
-			)
-	# Coral is the authored/current grid gate; mint is the compiler's proposed
-	# safe straight. Nothing is changed until the adjacent review is accepted.
-	draw_circle(current, 15.0, Color(DesignSystem.CORAL, 0.18), true)
-	draw_arc(current, 15.0, 0.0, TAU, 32, DesignSystem.CORAL, 3.0, true)
-	draw_line(current + Vector2(-9.0, -9.0), current + Vector2(9.0, 9.0), DesignSystem.CORAL, 3.0, true)
-	draw_line(current + Vector2(9.0, -9.0), current + Vector2(-9.0, 9.0), DesignSystem.CORAL, 3.0, true)
-	draw_circle(proposed, 19.0, Color(DesignSystem.MINT, 0.16), true)
-	draw_arc(proposed, 19.0, 0.0, TAU, 40, DesignSystem.MINT, 4.0, true)
-	draw_line(proposed + Vector2(0.0, -24.0), proposed + Vector2(0.0, 24.0), DesignSystem.WHITE, 3.0, true)

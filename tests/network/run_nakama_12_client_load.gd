@@ -343,8 +343,8 @@ func _compiled_manifest() -> Dictionary:
 	var source_hash := "2e2e131d3e17420ddea775765e5fcc1ade1b898abd4c4a380d21212825fbb357"
 	return {
 		"track_definition": {
-			"schema_version": 1,
-			"generator_version": 2,
+			"schema_version": 2,
+			"generator_version": 3,
 			"track_id": "nakama-stadium",
 			"track_name": "Nakama Stadium",
 			"author_id": "",
@@ -363,6 +363,7 @@ func _compiled_manifest() -> Dictionary:
 			"target_length": 1200,
 			"track_width": 72,
 			"theme": "classic",
+			"road_surface": "smooth_asphalt",
 			"pit_side": "none",
 			"decoration_density": 0.5,
 			"deterministic_seed": "42",
@@ -373,7 +374,7 @@ func _compiled_manifest() -> Dictionary:
 			"updated_at_timestamp": 0,
 		},
 		"source_hash": source_hash,
-		"generator_version": 2,
+		"generator_version": 3,
 		"compiled_fingerprint": "e90dedcf44ba60445ad6bc75fe210d6ec4d3e7431d960ff1241b805f7a6448f6",
 	}
 

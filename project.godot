@@ -6,7 +6,7 @@ config_version=5
 
 config/name="RaceGlyph"
 config/description="Draw a circuit. Shape the race."
-config/version="0.2.0"
+config/version="0.3.0"
 run/main_scene="res://game/ui/main.tscn"
 config/auto_accept_quit=false
 config/icon="res://assets/final/brand/raceglyph_mark.svg"

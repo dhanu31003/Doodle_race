@@ -5,8 +5,8 @@ extends RefCounted
 ## Keep these values deterministic and platform-neutral. Changing a value that
 ## affects compilation requires incrementing TrackCompiler.COMPILER_VERSION.
 
-const TRACK_SCHEMA_VERSION: int = 1
-const TRACK_COMPILER_VERSION: int = 2
+const TRACK_SCHEMA_VERSION: int = 2
+const TRACK_COMPILER_VERSION: int = 3
 
 const COORDINATE_SCALE: int = 1000
 const COORDINATE_QUANTUM: float = 1.0 / float(COORDINATE_SCALE)
@@ -31,6 +31,7 @@ const MAX_TRACK_ID_BYTES: int = 96
 const MAX_AUTHOR_ID_BYTES: int = 128
 const MAX_DISPLAY_NAME_LENGTH: int = 80
 const MAX_THEME_BYTES: int = 64
+const MAX_ROAD_SURFACE_BYTES: int = 32
 const MAX_BRIDGE_CROSSINGS: int = 16
 
 const MAX_TARGET_LENGTH: float = 100_000.0
@@ -46,8 +47,8 @@ const MIN_SAMPLE_SPACING: float = 1.0
 const MAX_SAMPLE_SPACING: float = 64.0
 
 const MIN_TRACK_LENGTH: float = 500.0
-const MIN_TURN_RADIUS: float = 24.0
-const MIN_RADIUS_TO_WIDTH_RATIO: float = 0.75
+const MIN_TURN_RADIUS: float = 18.0
+const MIN_RADIUS_TO_WIDTH_RATIO: float = 0.50
 const START_STRAIGHT_LENGTH: float = 96.0
 const START_STRAIGHT_MAX_ANGLE_DEGREES: float = 10.0
 const PIT_STRAIGHT_LENGTH: float = 180.0

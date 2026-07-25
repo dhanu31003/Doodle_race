@@ -2,10 +2,10 @@ class_name NetworkLimits
 extends RefCounted
 ## Versioned multiplayer limits shared by transports, clients, and tests.
 
-const PROTOCOL_VERSION: int = 2
-const APP_BUILD_ID: String = "0.2.0"
-const TRACK_SCHEMA_VERSION: int = 1
-const TRACK_GENERATOR_VERSION: int = 2
+const PROTOCOL_VERSION: int = 3
+const APP_BUILD_ID: String = "0.3.0"
+const TRACK_SCHEMA_VERSION: int = 2
+const TRACK_GENERATOR_VERSION: int = 3
 const SUPPORTED_PLATFORMS: Array[String] = ["android", "ios", "linux", "macos", "web", "windows"]
 const MAX_PLAYERS: int = 12
 const ROOM_CODE_LENGTH: int = 6
@@ -56,7 +56,7 @@ const STEERING_STATE_Q_LIMIT: int = 10_000
 const SLIP_ANGLE_Q_LIMIT: int = 15_708
 const WHEEL_SLIP_Q_LIMIT: int = 40_000
 const LATERAL_ACCELERATION_Q_LIMIT: int = 2_000_000
-const VERTICAL_OFFSET_Q_LIMIT: int = 80_000
+const VERTICAL_OFFSET_Q_LIMIT: int = 120_000
 const VERTICAL_VELOCITY_Q_LIMIT: int = 300_000
 const CONTACT_SERIAL_LIMIT: int = MAX_SAFE_SEQUENCE
 const CONTACT_TICK_LIMIT: int = MAX_SAFE_SEQUENCE

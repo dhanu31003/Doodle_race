@@ -7,6 +7,7 @@ const RaceScreenType := preload("res://game/ui/screens/race_screen.gd")
 const TrackDefinitionType := preload("res://game/track/definition/track_definition.gd")
 const TrackCompilerType := preload("res://game/track/generation/track_compiler.gd")
 const RaceInputType := preload("res://game/race/race_input.gd")
+const RaceEntryType := preload("res://game/race/race_entry.gd")
 
 const FIXTURE := "res://tests/fixtures/tracks/stadium_v1.json"
 
@@ -169,6 +170,36 @@ func _run() -> void:
 		test.assert_equal(screen.perspective_view.camera_mode, original_camera, "camera toggle returns to the original persisted view")
 		if not screen.selected_vehicle.is_empty():
 			test.assert_true(str(screen.selected_vehicle.get("car_id", "")).begins_with("car-"), "garage-selected vehicle identity reaches the grid")
+		# Player result presentation must not freeze the authority before the AI
+		# field has crossed the line. Rows update live and sharing unlocks only once
+		# every finisher/DNF has an authoritative terminal result.
+		player.status = RaceEntryType.STATUS_FINISHED
+		player.finish_order = 1
+		player.finish_time = 65.125
+		screen._finish_race()
+		test.assert_true(screen.finished and screen.results_panel.visible, "player finish opens the result scoreboard")
+		test.assert_false(screen.director.paused, "player finish leaves race authority running for the AI field")
+		test.assert_true(_control_tree_contains(screen.results_panel, "LIVE CLASSIFICATION"), "scoreboard identifies the still-updating classification")
+		test.assert_true(_control_tree_contains(screen.results_panel, "1/6 COMPLETE"), "scoreboard reports how many authoritative results are complete")
+		test.assert_true(_control_tree_contains(screen.results_panel, "FINISHING") and _control_tree_contains(screen.results_panel, "ON TRACK"), "unfinished AI rows use a live state instead of a false no-time result")
+		test.assert_false(_control_tree_contains(screen.results_panel, "NO TIME"), "active AI drivers are never presented as missing finish data")
+		var field_time_before := screen.director.race_time
+		screen._process(1.0 / 30.0)
+		test.assert_true(screen.director.race_time > field_time_before, "AI simulation continues behind the post-player scoreboard")
+		for entry_index in screen.director.entries.size():
+			var entry = screen.director.entries[entry_index]
+			if entry == player:
+				continue
+			entry.status = RaceEntryType.STATUS_FINISHED
+			entry.finish_order = entry_index + 1
+			entry.finish_time = 65.125 + float(entry_index) * 1.125
+		screen.director.phase = screen.director.PHASE_RESULTS
+		screen._refresh_results_panel_if_changed(true)
+		test.assert_true(_control_tree_contains(screen.results_panel, "FULL CLASSIFICATION"), "terminal scoreboard switches to the complete classification")
+		test.assert_true(_control_tree_contains(screen.results_panel, "01:66") == false, "finish-time formatting remains conventional")
+		test.assert_true(_control_tree_contains(screen.results_panel, "01:06.250"), "later AI finish time appears on the refreshed scoreboard")
+		var final_share := _find_button(screen.results_panel, "SHARE RESULTS")
+		test.assert_true(final_share != null and not final_share.disabled, "sharing unlocks only after every player and AI result is available")
 	screen.queue_free()
 	await process_frame
 	screen = null

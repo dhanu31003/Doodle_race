@@ -14,6 +14,8 @@ static func migrate_to_current(input: Dictionary) -> Dictionary:
 		match version:
 			0:
 				migrated = _migrate_v0_to_v1(migrated)
+			1:
+				migrated = _migrate_v1_to_v2(migrated)
 			_:
 				break
 		var next_version := _safe_int(migrated.get("schema_version"), version)
@@ -24,7 +26,7 @@ static func migrate_to_current(input: Dictionary) -> Dictionary:
 
 
 static func supported_source_versions() -> PackedInt32Array:
-	return PackedInt32Array([0, 1])
+	return PackedInt32Array([0, 1, 2])
 
 
 static func _migrate_v0_to_v1(legacy: Dictionary) -> Dictionary:
@@ -59,6 +61,17 @@ static func _migrate_v0_to_v1(legacy: Dictionary) -> Dictionary:
 	}
 	if _legacy_has_type_errors(legacy):
 		migrated["_migration_error"] = "Legacy field has an invalid type or unsafe integer."
+	return migrated
+
+
+static func _migrate_v1_to_v2(legacy: Dictionary) -> Dictionary:
+	var migrated := legacy.duplicate(true)
+	migrated["schema_version"] = 2
+	# Road-surface physics changed compiler authority. All schema-v1 tracks use
+	# the old clean-asphalt behavior and are deterministically recompiled.
+	migrated["generator_version"] = GameLimitsType.TRACK_COMPILER_VERSION
+	migrated["road_surface"] = "smooth_asphalt"
+	migrated["content_hash"] = ""
 	return migrated
 
 

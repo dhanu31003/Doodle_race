@@ -5,6 +5,7 @@ extends Control
 
 const CAMERA_COCKPIT: StringName = &"cockpit"
 const CAMERA_CHASE: StringName = &"chase"
+const RoadSurfaceCatalogType := preload("res://game/content/road_surface_catalog.gd")
 
 const AI_COLORS := [
 	Color("ff6b72"), Color("51c8ff"), Color("ffc857"), Color("b99cff"),
@@ -440,6 +441,13 @@ func _project(distance_ahead: float, lateral_offset: float) -> Dictionary:
 
 
 func _draw_road(road: Array[Dictionary]) -> void:
+	var surface_profile := _track.surface_profile() if _track != null \
+			else RoadSurfaceCatalogType.profile(RoadSurfaceCatalogType.SMOOTH_ASPHALT)
+	var surface_color: Color = surface_profile.get("road_color", DAY_ASPHALT)
+	var runoff_color: Color = surface_profile.get("runoff_color", DAY_GRAVEL)
+	var loose_surface := bool(surface_profile.get("loose_surface", false))
+	var surface_style := _track.road_surface if _track != null \
+			else RoadSurfaceCatalogType.SMOOTH_ASPHALT
 	for index in range(road.size() - 2, -1, -1):
 		var near: Dictionary = road[index]
 		var far: Dictionary = road[index + 1]
@@ -466,7 +474,7 @@ func _draw_road(road: Array[Dictionary]) -> void:
 			far_center + Vector2(-far_half * foundation_factor, 0.0),
 		]), Color("315b3b"))
 		var gravel_factor := ROAD_GRAVEL_FACTOR
-		var gravel := DAY_GRAVEL.lerp(Color("c0b68f"), float(index % 3) * 0.025)
+		var gravel := runoff_color.lerp(Color("c0b68f"), float(index % 3) * 0.025)
 		draw_colored_polygon(PackedVector2Array([
 			near_center + Vector2(-near_half * gravel_factor, 0.0),
 			near_center + Vector2(near_half * gravel_factor, 0.0),
@@ -482,13 +490,65 @@ func _draw_road(road: Array[Dictionary]) -> void:
 			far_center + Vector2(far_half * curb_factor, 0.0),
 			far_center + Vector2(-far_half * curb_factor, 0.0),
 		]), curb_color)
-		var asphalt := DAY_ASPHALT.lerp(Color("35414c"), float(index % 2) * 0.06)
+		var asphalt := surface_color.lerp(
+			Color("d1c6ad") if loose_surface else Color("58616a"),
+			float(index % 3) * (0.045 if loose_surface else 0.025)
+		)
 		draw_colored_polygon(PackedVector2Array([
 			near_center + Vector2(-near_half, 0.0),
 			near_center + Vector2(near_half, 0.0),
 			far_center + Vector2(far_half, 0.0),
 			far_center + Vector2(-far_half, 0.0),
 		]), asphalt)
+		if surface_style == RoadSurfaceCatalogType.BUMPY_ASPHALT and index % 5 == 2:
+			var patch_side := -1.0 if index % 2 == 0 else 1.0
+			draw_colored_polygon(PackedVector2Array([
+				near_center + Vector2(patch_side * near_half * 0.08 - near_half * 0.56, 0.0),
+				near_center + Vector2(patch_side * near_half * 0.08 + near_half * 0.56, 0.0),
+				far_center + Vector2(patch_side * far_half * 0.08 + far_half * 0.48, 0.0),
+				far_center + Vector2(patch_side * far_half * 0.08 - far_half * 0.48, 0.0),
+			]), Color(0.075, 0.085, 0.09, 0.72))
+			draw_line(
+				near_center + Vector2(-near_half * 0.58, 0.0),
+				far_center + Vector2(far_half * 0.44, 0.0),
+				Color(0.01, 0.014, 0.016, 0.76),
+				maxf(1.0, float(near["scale"]) * 0.08), true
+			)
+		elif surface_style == RoadSurfaceCatalogType.COMPACT_GRAVEL:
+			var gravel_center := near_center.lerp(far_center, 0.42)
+			var gravel_half := lerpf(near_half, far_half, 0.42)
+			var gravel_noise := fposmod(float(index * 47), 101.0) / 100.0 - 0.5
+			draw_circle(
+				gravel_center + Vector2(gravel_noise * gravel_half * 1.55, 0.0),
+				clampf(float(near["scale"]) * 0.10, 0.65, 3.0),
+				Color("d9c28e") if index % 2 == 0 else Color("594d39")
+			)
+		elif surface_style == RoadSurfaceCatalogType.MUD:
+			var rut_color := Color(0.105, 0.064, 0.038, 0.78)
+			draw_line(
+				near_center + Vector2(-near_half * 0.31, 0.0),
+				far_center + Vector2(-far_half * 0.31, 0.0),
+				rut_color, maxf(1.5, float(near["scale"]) * 0.18), true
+			)
+			draw_line(
+				near_center + Vector2(near_half * 0.31, 0.0),
+				far_center + Vector2(far_half * 0.31, 0.0),
+				rut_color, maxf(1.5, float(near["scale"]) * 0.18), true
+			)
+			if index % 7 == 3:
+				draw_circle(
+					near_center.lerp(far_center, 0.45),
+					clampf(float(near["scale"]) * 0.24, 1.0, 6.0),
+					Color(0.055, 0.050, 0.045, 0.70)
+				)
+		elif surface_style == RoadSurfaceCatalogType.WEATHERED_ASPHALT \
+				and index % 6 == 3:
+			draw_line(
+				near_center + Vector2(-near_half * 0.62, 0.0),
+				far_center + Vector2(far_half * 0.36, 0.0),
+				Color(0.025, 0.030, 0.030, 0.62),
+				maxf(1.0, float(near["scale"]) * 0.06), true
+			)
 		# A faint sunward tone and occasional sealed joints prevent the wide
 		# asphalt plane from reading as a single flat vector fill.
 		draw_colored_polygon(PackedVector2Array([
@@ -497,7 +557,9 @@ func _draw_road(road: Array[Dictionary]) -> void:
 			far_center + Vector2(-far_half * 0.08, 0.0),
 			far_center + Vector2(-far_half * 0.88, 0.0),
 		]), Color(0.86, 0.91, 0.91, 0.020))
-		if not _low_graphics and index % 9 == 4:
+		var joint_stride := 5 if _track != null \
+				and _track.road_surface == RoadSurfaceCatalogType.BUMPY_ASPHALT else 9
+		if not _low_graphics and index % joint_stride == 4:
 			draw_line(
 				near_center + Vector2(-near_half * 0.93, 0.0),
 				near_center + Vector2(near_half * 0.93, 0.0),

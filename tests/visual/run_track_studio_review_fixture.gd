@@ -1,5 +1,5 @@
 extends SceneTree
-## Visual QA fixture for the explicit start-grid relocation review.
+## Visual QA fixture for the standalone WORLD & ROAD inspector.
 
 const TrackStudioType := preload("res://game/ui/screens/track_studio.gd")
 
@@ -9,6 +9,10 @@ func _initialize() -> void:
 
 
 func _build_fixture() -> void:
+	var output := "/tmp/raceglyph-track-studio-world.png"
+	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--output="):
+			output = argument.trim_prefix("--output=")
 	root.size = Vector2i(1280, 720)
 	var screen := TrackStudioType.new()
 	screen.size = Vector2(1280.0, 720.0)
@@ -16,15 +20,16 @@ func _build_fixture() -> void:
 	await process_frame
 	await process_frame
 	screen.canvas.load_demo_loop()
-	var source := screen.canvas.points.duplicate()
-	if source.size() > 1 and source[0].is_equal_approx(source[-1]):
-		source.remove_at(source.size() - 1)
-	var shifted := PackedVector2Array()
-	var curve_start := mini(15, source.size() - 1)
-	for index in source.size():
-		shifted.append(source[(index + curve_start) % source.size()])
-	shifted.append(shifted[0])
-	screen.canvas.points = shifted
-	screen.canvas.track_changed.emit(shifted.size(), true)
 	screen.name_field.text = "Aurora Bend"
-	screen._confirm_track()
+	screen._mode_tabs.current_tab = 1
+	screen._on_inspector_mode_changed(1)
+	for _frame in 12:
+		await process_frame
+	var image := root.get_texture().get_image()
+	var error := image.save_png(output)
+	print("TRACK_STUDIO_WORLD_VISUAL output=%s save_error=%d grid_review_nodes=%d" % [
+		output,
+		error,
+		screen.find_children("*Grid*Review*", "Control", true, false).size(),
+	])
+	quit(0 if error == OK else 1)

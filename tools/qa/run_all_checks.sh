@@ -96,6 +96,7 @@ run_case "true 3D track mesh" tests/presentation3d/run_presentation_3d_tests.sh
 run_case "true 3D Formula car" tests/presentation3d/run_formula_car_visual_3d_test.sh
 run_case "fixed-distance 3D camera rig" tests/presentation3d/run_camera_rig_3d_test.sh
 run_case "bounded 3D collision sparks" tests/presentation3d/run_collision_spark_pool_3d_test.sh
+run_case "bounded road-surface rain and spray" tests/presentation3d/run_road_surface_effects_3d_test.sh
 run_case "true 3D fixed race world" tests/presentation3d/run_race_world_3d_integration.sh
 run_case "all default-circuit 3D scenery clearance" tests/presentation3d/run_predefined_scenery_clearance_test.sh
 run_case "content and safe areas" tests/content/run_content_tests.sh

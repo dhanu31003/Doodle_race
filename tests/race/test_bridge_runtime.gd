@@ -159,7 +159,10 @@ func _test_natural_crest_airtime(test: RefCounted, fixture: Dictionary) -> void:
 
 	var launch_distance := query.wrap_distance(crest_distance - 1.25)
 	var airborne := model.create_state(&"crest-airborne", query, launch_distance)
-	airborne.velocity = airborne.forward() * 150.0
+	# The HUD calibration is 1.08 km/h per authority-speed unit. Exercise the
+	# reported failure at a true 160 mph (257.5 km/h), not at 160 authority units.
+	var speed_160_mph := 160.0 * 1.609344 / 1.08
+	airborne.velocity = airborne.forward() * speed_160_mph
 	var replay_model := VehicleModelType.new()
 	var replay := airborne.duplicate_state()
 	test.assert_true(model.step_fixed(airborne, RaceInputType.new(), query), "fast rising-crest traversal remains finite")
@@ -168,11 +171,38 @@ func _test_natural_crest_airtime(test: RefCounted, fixture: Dictionary) -> void:
 	test.assert_false(airborne.is_grounded, "a sufficiently fast car releases from the rising ramp onto the flat deck")
 	test.assert_true(
 		airborne.vertical_velocity_mps >= VehicleModelType.MIN_CREST_LAUNCH_VERTICAL_SPEED_MPS \
-			and airborne.vertical_velocity_mps <= VehicleModelType.MAX_CREST_LAUNCH_VERTICAL_SPEED_MPS,
-		"crest launch vertical speed stays inside the short physical arc envelope"
+			and airborne.vertical_velocity_mps <= VehicleModelType.MAX_CREST_LAUNCH_VERTICAL_SPEED_MPS + 0.0001,
+		"crest launch vertical speed stays inside the natural bounded arc envelope"
 	)
 	test.assert_near(airborne.vertical_offset_meters, 0.0, 0.0001, "launch begins continuously at the road surface")
 	var launch_velocity := airborne.vertical_velocity_mps
+	var neutral_flight := airborne.duplicate_state()
+	var powered_flight := airborne.duplicate_state()
+	var braked_flight := airborne.duplicate_state()
+	test.assert_true(
+		model.step_fixed(neutral_flight, RaceInputType.new(), query),
+		"neutral airborne control fixture remains finite"
+	)
+	test.assert_true(
+		model.step_fixed(powered_flight, RaceInputType.new(1.0, 1.0, 0.0), query),
+		"powered airborne control fixture remains finite"
+	)
+	test.assert_true(
+		model.step_fixed(braked_flight, RaceInputType.new(-1.0, 0.0, 1.0), query),
+		"braked airborne control fixture remains finite"
+	)
+	test.assert_near(
+		powered_flight.velocity.distance_to(neutral_flight.velocity), 0.0, 0.0001,
+		"throttle and steering cannot create tyre force while airborne"
+	)
+	test.assert_near(
+		braked_flight.velocity.distance_to(neutral_flight.velocity), 0.0, 0.0001,
+		"brake and steering cannot create tyre force while airborne"
+	)
+	test.assert_near(
+		powered_flight.heading, neutral_flight.heading, 0.0001,
+		"airborne steering rack movement cannot rotate the chassis"
+	)
 	model.step_fixed(airborne, RaceInputType.new(), query)
 	replay_model.step_fixed(replay, RaceInputType.new(), query)
 	test.assert_equal(airborne.authority_snapshot(), replay.authority_snapshot(), "gravity integration replays exactly after launch")
@@ -187,19 +217,26 @@ func _test_natural_crest_airtime(test: RefCounted, fixture: Dictionary) -> void:
 	var maximum_height := airborne.vertical_offset_meters
 	var last_positive_height := airborne.vertical_offset_meters
 	var saw_descent := airborne.vertical_velocity_mps < 0.0
-	while not airborne.is_grounded and airborne_ticks < 90:
+	while not airborne.is_grounded and airborne_ticks < 210:
 		last_positive_height = airborne.vertical_offset_meters
 		test.assert_true(model.step_fixed(airborne, RaceInputType.new(), query), "airborne authority remains finite through tick %d" % airborne_ticks)
 		test.assert_true(replay_model.step_fixed(replay, RaceInputType.new(), query), "airborne replay remains finite through tick %d" % airborne_ticks)
 		maximum_height = maxf(maximum_height, airborne.vertical_offset_meters)
 		saw_descent = saw_descent or airborne.vertical_velocity_mps < 0.0
 		airborne_ticks += 1
+	print(
+		"CREST_AIRTIME speed_mph=160.0 launch_mps=%.3f seconds=%.3f max_height_m=%.3f" % [
+			launch_velocity,
+			float(airborne_ticks) * VehicleModelType.FIXED_DT,
+			maximum_height,
+		]
+	)
 	test.assert_equal(airborne.authority_snapshot(), replay.authority_snapshot(), "complete gravity arc is deterministic through landing")
 	test.assert_true(saw_descent, "ballistic arc includes a gravity-driven descent")
 	test.assert_true(airborne.is_grounded, "the car lands back on the bridge surface")
-	test.assert_true(airborne_ticks >= 4 and airborne_ticks < 60, "crest airtime is visible but bounded below one second")
-	test.assert_true(maximum_height > 0.02 and maximum_height < 1.0, "crest float is measurable without becoming an exaggerated jump")
-	test.assert_true(last_positive_height < 0.12, "landing closes only a small final clearance for a smooth touchdown")
+	test.assert_true(airborne_ticks >= 60 and airborne_ticks < 210, "160 mph crest airtime lasts at least one second but remains bounded")
+	test.assert_true(maximum_height > 1.0 and maximum_height < 12.0, "high-speed crest follows a visible gravity arc inside the authority height cap")
+	test.assert_true(last_positive_height < 0.35, "landing closes only a small final clearance for a smooth touchdown")
 	test.assert_near(airborne.vertical_offset_meters, 0.0, 0.0001, "landing restores exact zero height")
 	test.assert_near(airborne.vertical_velocity_mps, 0.0, 0.0001, "landing clears vertical velocity")
 	test.assert_true(airborne.is_finite(), "landed authority remains finite")

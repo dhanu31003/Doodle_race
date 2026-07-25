@@ -4,6 +4,7 @@ const TestCaseType := preload("res://tests/support/test_case.gd")
 const FormulaCarVisualType := preload("res://game/presentation3d/formula_car_visual_3d.gd")
 const VehicleStateType := preload("res://game/race/vehicle_state.gd")
 const RaceInputType := preload("res://game/race/race_input.gd")
+const RoadSurfaceCatalogType := preload("res://game/content/road_surface_catalog.gd")
 
 
 func _initialize() -> void:
@@ -114,6 +115,49 @@ func _run() -> void:
 		mobile_budget_apply_count, desktop_budget_apply_count + 1,
 		"changing render tier performs exactly one bounded configuration pass"
 	)
+	off_tree_visual.configure_surface(RoadSurfaceCatalogType.MUD)
+	var mud_churn_start: Dictionary = off_tree_visual.presentation_snapshot()
+	for frame in 120:
+		off_tree_visual.set_surface_lap_progress(float(frame) / 240.0)
+		off_tree_visual.apply_vehicle_state(
+			{
+				"velocity": Vector2(80.0, 0.0),
+				"steering_input": 0.35,
+				"wheel_slip": 0.0,
+			},
+			null,
+			1.0 / 60.0
+		)
+	var mud_churn_end: Dictionary = off_tree_visual.presentation_snapshot()
+	test.assert_true(
+		int(mud_churn_end.get("surface_appearance_apply_count", 999))
+				- int(mud_churn_start.get("surface_appearance_apply_count", 0)) <= 2,
+		"mobile remote mud tint uses three stages instead of per-frame material churn"
+	)
+	test.assert_true(
+		float(mud_churn_end.get("mud_accumulation", 0.0)) > 0.0
+				and not bool(mud_churn_end.get("surface_coating_visible", true)),
+		"mobile opponents become visibly dirt-tinted without repeated splatter draws"
+	)
+	test.assert_true(
+		int(mud_churn_end.get("rain_light_material_update_count", 999))
+				- int(mud_churn_start.get("rain_light_material_update_count", 0)) <= 1,
+		"idle mobile remote rain lights avoid synchronized per-frame material writes"
+	)
+	off_tree_visual.configure_surface(RoadSurfaceCatalogType.SMOOTH_ASPHALT)
+	var mobile_born_remote := FormulaCarVisualType.new()
+	mobile_born_remote.configure(Color("4ca9e8"), false, true)
+	mobile_born_remote.configure_surface(RoadSurfaceCatalogType.MUD)
+	mobile_born_remote.set_surface_lap_progress(1.0)
+	var mobile_born_mud: Dictionary = mobile_born_remote.presentation_snapshot()
+	test.assert_true(
+		not bool(mobile_born_mud.get("surface_coating_node_present", true))
+				and int(mobile_born_mud.get("presentation_node_count", 999)) <= 21
+				and int(mobile_born_mud.get("mesh_instance_count", 999)) <= 6
+				and float(mobile_born_mud.get("mud_accumulation", 0.0)) > 0.99,
+		"mobile-born opponents keep full brown tint without allocating splatter geometry"
+	)
+	mobile_born_remote.free()
 	for _frame in 120:
 		off_tree_visual.apply_vehicle_state(
 			{"velocity": Vector2(80.0, 0.0), "steering_input": 0.35},
@@ -195,6 +239,10 @@ func _run() -> void:
 				and int(chase_lod.get("visible_cockpit_detail_count", -1)) == 0,
 		"chase mode can synchronously cull every player-only cockpit detail"
 	)
+	test.assert_false(
+		bool(chase_lod.get("cockpit_halo_guard_visible", true)),
+		"chase mode removes the triangular forward halo frame from the player car"
+	)
 	test.assert_equal(
 		int(chase_lod.get("presentation_node_count", -2)), structural_node_count,
 		"chase culling changes visibility without rebuilding the Formula graph"
@@ -205,6 +253,10 @@ func _run() -> void:
 	)
 	visual.set_cockpit_detail_visible(true)
 	var restored_cockpit: Dictionary = visual.presentation_snapshot()
+	test.assert_true(
+		bool(restored_cockpit.get("cockpit_halo_guard_visible", false)),
+		"cockpit mode restores the forward halo frame around the driver"
+	)
 	test.assert_equal(
 		int(restored_cockpit.get("visible_cockpit_detail_count", -1)),
 		int(restored_cockpit.get("cockpit_detail_count", -2)),
@@ -228,6 +280,57 @@ func _run() -> void:
 	)
 	var resting_cockpit_socket := visual.cockpit_socket().global_transform
 	var resting_chase_socket := visual.chase_target_socket().global_transform
+	visual.configure_surface(RoadSurfaceCatalogType.SMOOTH_ASPHALT)
+	var smooth_appearance: Dictionary = visual.presentation_snapshot()
+	visual.configure_surface(RoadSurfaceCatalogType.COMPACT_GRAVEL)
+	var gravel_appearance: Dictionary = visual.presentation_snapshot()
+	visual.configure_surface(RoadSurfaceCatalogType.MUD)
+	var clean_mud_appearance: Dictionary = visual.presentation_snapshot()
+	visual.set_surface_lap_progress(0.35)
+	var partial_mud_appearance: Dictionary = visual.presentation_snapshot()
+	visual.set_surface_lap_progress(1.0)
+	var mud_appearance: Dictionary = visual.presentation_snapshot()
+	visual.configure_surface(RoadSurfaceCatalogType.WEATHERED_ASPHALT)
+	var wet_appearance: Dictionary = visual.presentation_snapshot()
+	test.assert_false(
+		bool(smooth_appearance.get("surface_coating_visible", true)),
+		"smooth asphalt keeps the Formula body clean"
+	)
+	test.assert_true(
+		bool(gravel_appearance.get("surface_coating_visible", false))
+				and str(gravel_appearance.get("road_surface", "")) == "compact_gravel",
+		"gravel adds a visible bounded dust coating to the car"
+	)
+	test.assert_true(
+		bool(clean_mud_appearance.get("surface_coating_visible", false))
+				and float(clean_mud_appearance.get("surface_coating_opacity", -1.0)) == 0.0
+				and float(clean_mud_appearance.get("mud_accumulation", -1.0)) == 0.0,
+		"mud prewarms one alpha-zero player coating draw while the grid starts visibly clean"
+	)
+	test.assert_true(
+		float(partial_mud_appearance.get("mud_accumulation", 0.0)) > 0.15
+				and int(partial_mud_appearance.get("surface_coating_visible_count", 0)) >= 2
+				and float(partial_mud_appearance.get("surface_coating_opacity", 0.0)) > 0.40,
+		"the player car visibly accumulates brown mud through the opening lap"
+	)
+	test.assert_true(
+		bool(mud_appearance.get("surface_coating_visible", false))
+				and int(mud_appearance.get("surface_coating_count", 0)) >= 6
+				and int(mud_appearance.get("surface_coating_visible_count", 0))
+						== int(mud_appearance.get("surface_coating_count", -1))
+				and float(mud_appearance.get("body_roughness", 0.0)) > 0.68
+				and float(mud_appearance.get("mud_accumulation", 0.0)) > 0.99
+				and not (mud_appearance.get("body_surface_color", Color.WHITE) as Color).is_equal_approx(
+					smooth_appearance.get("body_surface_color", Color.WHITE) as Color
+				),
+		"full exposure turns the body, accents and wheels into a strong rough brown finish"
+	)
+	test.assert_true(
+		float(wet_appearance.get("body_roughness", 1.0)) < 0.10
+				and not bool(wet_appearance.get("surface_coating_visible", true)),
+		"weathered rain produces a glossy wet body rather than dry dirt spots"
+	)
+	visual.configure_surface(RoadSurfaceCatalogType.SMOOTH_ASPHALT)
 
 	var state := VehicleStateType.new()
 	state.velocity = Vector2(200.0, 0.0)
@@ -305,6 +408,28 @@ func _run() -> void:
 	test.assert_true(
 		absf(float(animated.get("body_heave_meters", 0.0))) <= 0.046,
 		"aero and pedal heave remain within suspension travel"
+	)
+	for _frame in 12:
+		visual.apply_vehicle_state(state, RaceInputType.new(), 1.0 / 60.0, 0.05)
+	var raised_surface_heave := float(
+		visual.presentation_snapshot().get("body_heave_meters", 0.0)
+	)
+	for _frame in 12:
+		visual.apply_vehicle_state(state, RaceInputType.new(), 1.0 / 60.0, -0.05)
+	var lowered_surface_heave := float(
+		visual.presentation_snapshot().get("body_heave_meters", 0.0)
+	)
+	test.assert_true(
+		raised_surface_heave > lowered_surface_heave + 0.035,
+		"deterministic road roughness visibly works the body and suspension"
+	)
+	test.assert_near(
+		visual.chase_target_socket().global_position.distance_to(
+			resting_chase_socket.origin
+		),
+		0.0,
+		0.000001,
+		"road roughness remains below the chase camera socket and cannot tilt the view"
 	)
 	test.assert_true(int(animated.get("active_shift_leds", 0)) >= 8, "high RPM illuminates the shift-light bank")
 	test.assert_true(

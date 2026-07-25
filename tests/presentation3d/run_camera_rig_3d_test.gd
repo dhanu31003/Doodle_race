@@ -98,6 +98,80 @@ func _run() -> void:
 		"chase vehicle framing remains invariant while its world position advances"
 	)
 
+	# A bridge ramp may change the vehicle root from level to a steep grade in one
+	# authority sample. The car must align immediately, but the external camera
+	# should ease that nod through both the climb and the descent.
+	rig.set_process(false)
+	var level_bridge_vehicle := Transform3D(
+		Basis.IDENTITY, Vector3(60.0, 3.0, -18.0)
+	)
+	rig.update_target(level_bridge_vehicle, 55.0, 0.0, 0)
+	rig.update_socket_targets(null, level_bridge_vehicle * Transform3D(
+		Basis.IDENTITY, Vector3(-4.65, 2.10, 0.0)
+	))
+	rig.snap_to_target()
+	var uphill_vehicle := Transform3D(
+		Basis(Vector3.BACK, deg_to_rad(24.0)),
+		Vector3(61.0, 3.4, -18.0)
+	)
+	rig.update_target(uphill_vehicle, 55.0, 0.0, 0)
+	rig.update_socket_targets(null, uphill_vehicle * Transform3D(
+		Basis.IDENTITY, Vector3(-4.65, 2.10, 0.0)
+	))
+	rig._process(1.0 / 60.0)
+	var climb_first: Dictionary = rig.presentation_snapshot()
+	test.assert_near(
+		float(climb_first["target_grade_pitch_radians"]),
+		deg_to_rad(24.0), 0.0001,
+		"bridge climb exposes the complete current road grade to the rig"
+	)
+	test.assert_true(
+		float(climb_first["smoothed_chase_pitch_radians"]) > 0.0
+				and float(climb_first["smoothed_chase_pitch_radians"])
+						<= CameraRigType.CHASE_MAX_GRADE_RATE_RADIANS / 60.0 + 0.0001,
+		"first uphill frame is rate-limited instead of snapping to the ramp angle"
+	)
+	test.assert_near(
+		(climb_first["camera_position"] as Vector3).distance_to(
+			climb_first["desired_position"] as Vector3
+		),
+		0.0, 0.000001,
+		"grade easing never introduces world-translation lag"
+	)
+	for _frame in 120:
+		rig._process(1.0 / 60.0)
+	var climb_settled: Dictionary = rig.presentation_snapshot()
+	test.assert_near(
+		float(climb_settled["smoothed_chase_pitch_radians"]),
+		deg_to_rad(24.0), deg_to_rad(0.15),
+		"chase grade converges smoothly to a sustained bridge climb"
+	)
+	var before_descent := float(climb_settled["smoothed_chase_pitch_radians"])
+	var downhill_vehicle := Transform3D(
+		Basis(Vector3.BACK, deg_to_rad(-18.0)),
+		Vector3(82.0, 4.2, -18.0)
+	)
+	rig.update_target(downhill_vehicle, 55.0, 0.0, 0)
+	rig.update_socket_targets(null, downhill_vehicle * Transform3D(
+		Basis.IDENTITY, Vector3(-4.65, 2.10, 0.0)
+	))
+	rig._process(1.0 / 60.0)
+	var descent_first: Dictionary = rig.presentation_snapshot()
+	test.assert_true(
+		before_descent - float(descent_first["smoothed_chase_pitch_radians"])
+				<= CameraRigType.CHASE_MAX_GRADE_RATE_RADIANS / 60.0 + 0.0001,
+		"first downhill frame is rate-limited instead of abruptly pitching down"
+	)
+	for _frame in 150:
+		rig._process(1.0 / 60.0)
+	var descent_settled: Dictionary = rig.presentation_snapshot()
+	test.assert_near(
+		float(descent_settled["smoothed_chase_pitch_radians"]),
+		deg_to_rad(-18.0), deg_to_rad(0.15),
+		"chase grade converges smoothly to a sustained bridge descent"
+	)
+	rig.set_process(true)
+
 	rig.update_target(vehicle, 70.0, -1.0, 0)
 	rig.snap_to_target()
 	var left_lock: Dictionary = rig.presentation_snapshot()

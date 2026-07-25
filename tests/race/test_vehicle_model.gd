@@ -5,6 +5,7 @@ const FactoryType := preload("res://tests/race/race_test_factory.gd")
 const RaceInputType := preload("res://game/race/race_input.gd")
 const VehicleConfigType := preload("res://game/race/vehicle_config.gd")
 const VehicleModelType := preload("res://game/race/arcade_vehicle_model.gd")
+const RoadSurfaceCatalogType := preload("res://game/content/road_surface_catalog.gd")
 
 
 func run() -> Dictionary:
@@ -13,6 +14,7 @@ func run() -> Dictionary:
 	_test_acceleration_braking_and_coast(test)
 	_test_formula_sequential_drivetrain(test)
 	_test_speed_sensitive_steering_and_tyre_load(test)
+	_test_road_surface_dynamics(test)
 	_test_conventional_reverse(test)
 	_test_offtrack_wall_and_contact(test)
 	_test_nitro_energy_and_cooldown(test)
@@ -259,6 +261,119 @@ func _full_lock_radius_m(model: ArcadeVehicleModel, track: RaceTrackQuery, speed
 	var yaw_delta := absf(wrapf(state.heading - before_heading, -PI, PI))
 	return speed * VehicleModelType.FIXED_DT / maxf(yaw_delta, 0.0001) \
 		* VehicleModelType.WORLD_UNIT_TO_METERS
+
+
+func _test_road_surface_dynamics(test: RefCounted) -> void:
+	var smooth_track := FactoryType.create_large_rectangle(100.0)
+	var weathered_track := FactoryType.create_large_rectangle(100.0)
+	var bumpy_track := FactoryType.create_large_rectangle(100.0)
+	var mud_track := FactoryType.create_large_rectangle(100.0)
+	var gravel_track := FactoryType.create_large_rectangle(100.0)
+	smooth_track.road_surface = RoadSurfaceCatalogType.SMOOTH_ASPHALT
+	weathered_track.road_surface = RoadSurfaceCatalogType.WEATHERED_ASPHALT
+	bumpy_track.road_surface = RoadSurfaceCatalogType.BUMPY_ASPHALT
+	mud_track.road_surface = RoadSurfaceCatalogType.MUD
+	gravel_track.road_surface = RoadSurfaceCatalogType.COMPACT_GRAVEL
+	var model := VehicleModelType.new()
+	var smooth_launch := model.create_state(&"smooth-launch", smooth_track, 100.0)
+	var mud_launch := model.create_state(&"mud-launch", mud_track, 100.0)
+	for _tick in 120:
+		model.step_fixed(smooth_launch, RaceInputType.new(0.0, 1.0, 0.0), smooth_track)
+		model.step_fixed(mud_launch, RaceInputType.new(0.0, 1.0, 0.0), mud_track)
+	test.assert_true(
+		smooth_launch.speed() > mud_launch.speed() + 18.0,
+		"mud traction and rolling drag produce a clearly slower two-second launch"
+	)
+	var five_second_speeds := {}
+	for surface_case in [
+		["smooth", smooth_track],
+		["weathered", weathered_track],
+		["bumpy", bumpy_track],
+		["gravel", gravel_track],
+		["mud", mud_track],
+	]:
+		var proof_state := model.create_state(
+			StringName("surface-proof-%s" % str(surface_case[0])),
+			surface_case[1], 100.0
+		)
+		for _tick in 300:
+			model.step_fixed(
+				proof_state, RaceInputType.new(0.0, 1.0, 0.0), surface_case[1]
+			)
+		five_second_speeds[str(surface_case[0])] = proof_state.speed()
+	print("SURFACE_PERFORMANCE_PROOF smooth=%.2f weathered=%.2f bumpy=%.2f gravel=%.2f mud=%.2f" % [
+		float(five_second_speeds["smooth"]),
+		float(five_second_speeds["weathered"]),
+		float(five_second_speeds["bumpy"]),
+		float(five_second_speeds["gravel"]),
+		float(five_second_speeds["mud"]),
+	])
+	test.assert_true(
+		float(five_second_speeds["smooth"]) > float(five_second_speeds["weathered"]) + 5.0
+				and float(five_second_speeds["weathered"]) > float(five_second_speeds["bumpy"]) + 3.0
+				and float(five_second_speeds["bumpy"]) > float(five_second_speeds["gravel"]) + 10.0
+				and float(five_second_speeds["gravel"]) > float(five_second_speeds["mud"]) + 8.0,
+		"all five surfaces produce a clearly ordered sustained acceleration result"
+	)
+	test.assert_true(
+		float(RoadSurfaceCatalogType.profile(RoadSurfaceCatalogType.MUD)["surface_speed_drag"])
+				> float(RoadSurfaceCatalogType.profile(RoadSurfaceCatalogType.COMPACT_GRAVEL)["surface_speed_drag"])
+				and float(RoadSurfaceCatalogType.profile(RoadSurfaceCatalogType.COMPACT_GRAVEL)["surface_speed_drag"])
+				> float(RoadSurfaceCatalogType.profile(RoadSurfaceCatalogType.BUMPY_ASPHALT)["surface_speed_drag"]),
+		"loose surfaces retain distinct speed scrub after the launch phase"
+	)
+
+	var smooth_braking := model.create_state(&"smooth-braking", smooth_track, 350.0)
+	var gravel_braking := model.create_state(&"gravel-braking", gravel_track, 350.0)
+	smooth_braking.velocity = smooth_braking.forward() * 180.0
+	gravel_braking.velocity = gravel_braking.forward() * 180.0
+	for _tick in 30:
+		model.step_fixed(smooth_braking, RaceInputType.new(0.0, 0.0, 1.0), smooth_track)
+		model.step_fixed(gravel_braking, RaceInputType.new(0.0, 0.0, 1.0), gravel_track)
+	test.assert_true(
+		gravel_braking.speed() > smooth_braking.speed() + 8.0,
+		"compact gravel requires a measurably longer braking zone than smooth asphalt"
+	)
+
+	var smooth_turn := model.create_state(&"smooth-turn", smooth_track, 350.0)
+	var mud_turn := model.create_state(&"mud-turn", mud_track, 350.0)
+	smooth_turn.velocity = smooth_turn.forward() * 150.0
+	mud_turn.velocity = mud_turn.forward() * 150.0
+	for _tick in 24:
+		model.step_fixed(smooth_turn, RaceInputType.new(0.75, 0.0, 0.0), smooth_track)
+		model.step_fixed(mud_turn, RaceInputType.new(0.75, 0.0, 0.0), mud_track)
+	test.assert_true(
+		absf(smooth_turn.heading) > absf(mud_turn.heading) + 0.025,
+		"mud reduces lateral authority without changing the steering rack input"
+	)
+
+	var smooth_peak := 0.0
+	var bumpy_peak := 0.0
+	for sample_index in 64:
+		var distance := smooth_track.total_length * float(sample_index) / 64.0
+		smooth_peak = maxf(smooth_peak, absf(RoadSurfaceCatalogType.bump_height_meters(
+			RoadSurfaceCatalogType.SMOOTH_ASPHALT, distance, smooth_track.total_length, 7719
+		)))
+		bumpy_peak = maxf(bumpy_peak, absf(RoadSurfaceCatalogType.bump_height_meters(
+			RoadSurfaceCatalogType.BUMPY_ASPHALT, distance, smooth_track.total_length, 7719
+		)))
+	test.assert_true(
+		bumpy_peak > smooth_peak * 12.0,
+		"bumpy asphalt drives substantially more suspension travel than smooth asphalt"
+	)
+	test.assert_near(
+		RoadSurfaceCatalogType.bump_height_meters(
+			RoadSurfaceCatalogType.BUMPY_ASPHALT, 0.0, smooth_track.total_length, 7719
+		),
+		RoadSurfaceCatalogType.bump_height_meters(
+			RoadSurfaceCatalogType.BUMPY_ASPHALT,
+			smooth_track.total_length,
+			smooth_track.total_length,
+			7719
+		),
+		0.000001,
+		"deterministic road roughness closes exactly at the lap seam"
+	)
 
 
 func _test_conventional_reverse(test: RefCounted) -> void:

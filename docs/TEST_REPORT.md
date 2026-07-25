@@ -1,39 +1,42 @@
 # Test Report
 
-Status: **current mobile-quality local evidence index**, updated 2026-07-25.
+Status: **current mobile-quality local evidence index**, updated 2026-07-26.
 
 ## Verdict
 
-The current mobile-quality game passes the complete normal automated gate, including complex-track recovery, six unusual default circuits, deterministic crest airtime, two-tier scenery clearance, a six-circuit twelve-car finish smoke, private-room coverage, and mobile Track Studio layouts. There is deliberately no claim of a new one-shot `tools/qa/run_all_checks.sh --release` PASS: the full frozen soak and backend operational components remain represented by their current targeted evidence. The 2026-07-23 one-shot release result below remains historical pre-upgrade regression evidence only.
+The current mobile-quality game passes the complete normal automated gate, including five visually and physically distinct deterministic road surfaces, surface-specific car coating, bounded moving rain/spray/debris, grade-aligned cars, smoothed chase bridge pitch, live post-finish full-field classification, chase-only halo removal, local-only extreme-corner rounding, automatic grid placement, six unusual default circuits, calibrated crest airtime, two-tier scenery clearance, a six-circuit twelve-car finish smoke, private-room client coverage, and mobile Track Studio layouts. There is deliberately no claim of a new one-shot `tools/qa/run_all_checks.sh --release` PASS: the full frozen soak and backend operational components remain represented by older targeted evidence until protocol 3 is requalified there. The 2026-07-23 one-shot release result below remains historical pre-upgrade regression evidence only.
 
 The current mobile-optimized Android APK passes static/signature audit, but its shipping Vulkan renderer could not present a surface in the available API 36 emulator's SwiftShader or host-GPU backend. A temporary non-shipping GL-compatibility smoke build did render and navigate through menu, setup, a twelve-car race, and active driving. The current unsigned iOS Xcode project passes static export audit, but no eligible iOS build/signing destination exists on this host.
 
 The product remains **NO-GO for public/store release**. The evidence is from a dirty/untracked tree rather than a clean immutable candidate; no physical-device, 30-minute thermal, signed Android release AAB, complete iOS build/archive/TestFlight, public TLS/staging/production backend, final legal/privacy/asset, or store approval exists.
 
-## Current mobile-quality normal requalification
+## Current surface and airtime normal requalification
 
-The optimized renderer, unusual-track catalog, gravity airtime, exact screenshot-shaped Track Studio recovery, slightly restored high-speed steering, structurally separated Studio tabs, cockpit correction, race telemetry/ranking UI, and private-room client hardening passed the current local normal gate on 2026-07-25. Combined with the current release-component reruns documented below, all release components are green; this still does not substitute for a fresh one-shot immutable-candidate run or physical-phone qualification.
+The five-surface system, progressive fixed-cost Mud coating, standard-gravity airtime, slope-following presentation, chase-grade easing, optimized renderer, live/final exact classification, unusual-track catalog, exact screenshot-shaped Track Studio recovery, automatic grid/bridge placement, high-speed steering, structurally separated Studio controls, chase/cockpit correction, race telemetry/ranking UI, and private-room client hardening passed the current local normal gate on 2026-07-26. The older real-backend and extended-soak records below are retained as regression history, not protocol-3 proof; this does not substitute for a fresh one-shot immutable-candidate run or physical-phone qualification.
 
 | Field | Current result |
 |---|---|
 | Full normal gate | `tools/qa/run_all_checks.sh`; `PASS all requested checks` |
-| UTC | `20260724T201458Z` |
-| Focused assertions | 4,414, all passed; plus 72/72 all-six AI finishers, 13 clean UI routes, 26 accessibility layouts, and source/editor/audio-playback checks |
-| Full log | [`../evidence/logs/full-check-20260724T201458Z.log`](../evidence/logs/full-check-20260724T201458Z.log) |
-| Log SHA-256 | `72ba57cfec32514e935fa4fda18b4921d56f00ca97774720af424736f4624d96` |
-| Track/content | Track 436; smoothing 32; built-in benchmark 166; runtime 14; screenshot-shaped Studio 16; features 494; render 32; 3D track 61; scenery clearance 73; content/safe-area 1,132 |
-| Formula/world | Formula car 67; camera 16; sparks 16; 3D world 99 |
-| Runtime systems | Persistence 364; audio 125 plus playback smoke; HUD 71; race authority/AI 537; race screen 67 |
+| UTC | `20260725T192237Z` |
+| Focused assertions | 4,706, all passed; plus 72/72 all-six AI finishers, 13 clean UI routes, 26 accessibility layouts, and source/editor/audio-playback checks |
+| Full log | [`../evidence/logs/full-check-20260725T192237Z.log`](../evidence/logs/full-check-20260725T192237Z.log) |
+| Log SHA-256 | `fac5a01f2c6db14d9a8c780e9fb735ccf52bb5325ac993615eb1a339f8dcba82` |
+| Track/content | Track 440; smoothing 33; built-in benchmark 166; runtime 14; screenshot-shaped Studio 24; features 494; render 32; 3D track 71; scenery clearance 73; content/safe-area 1,146 |
+| Formula/world | Formula car 81; camera 22; sparks 16; surface effects 48; 3D world 112 |
+| Runtime systems | Persistence 364; audio 125 plus playback smoke; HUD 71; race authority/AI 700; race screen 78 |
 | Private rooms | Network/protocol/fake/runtime 530; mobile lifecycle 29; product UI 37; local Nakama health endpoint passed |
 
 ### Current visual and dense-pack evidence
 
 - Hands and sleeves remain above the cockpit body at center and full steering lock: [center](../evidence/screenshots/cockpit_hand_clearance_20260724/center00000010.png), [full right](../evidence/screenshots/cockpit_hand_clearance_20260724/full_right00000010.png), and [full left](../evidence/screenshots/cockpit_hand_clearance_20260724/full_left00000010.png).
-- Chase view synchronously culls 90 player-only interior microdetails; cockpit restores them without rebuilding the scene graph. Exterior proof: [chase](../evidence/screenshots/chase_exterior_cockpit_culled_20260724/chase00000035.png).
+- The four forward halo bars belong to a dedicated cockpit-only guard. Chase view hides that triangular frame while retaining the lower exterior rails; cockpit restores the guard without rebuilding the scene graph, and remote cars keep their full halo. Current chase proof is visible in all three surface captures below.
 - The speedometer/telemetry cluster shows speed, gear, RPM, 16 rev LEDs, lap, sector, race time, shift/off-track state; the top-left ranking panel supports all 12 drivers, gaps, finish/DNF, player highlight, and immediate overtakes. Safe-area captures: [nearby cockpit](../evidence/screenshots/hud_mobile_final/nearby_cockpit_clear00000009.png), [wide](../evidence/screenshots/hud_mobile_final/wide_safe00000009.png), and [narrow](../evidence/screenshots/hud_mobile_final/narrow_safe00000009.png).
 - The dimmer daylight grade keeps the scene clearly daytime without clipped sky/barriers. The opening venue now visibly includes patterned boards, two populated grandstands, and fence-safe stepped audience terraces: [reviewed chase frame](../evidence/screenshots/trackside_visual_qa_20260724_b/chase00000310.png).
 - The current default catalog is visibly non-oval and uses six distinct archetypes—trident, crescent hammerhead, five-lobe crown, interlocking river knot, elevated figure-eight, and seven-apex rosette: [current six-circuit contact sheet](../evidence/screenshots/unusual_catalog_20260725/all_six_circuits.png).
-- The Studio DRAW/WORLD selector is visually separate from Undo/Redo, keeps 48 px touch targets, and shows the requested adjacent Snap-then-Demo order: [fresh 1280×720 proof](../evidence/screenshots/track_studio_overlap_fix_20260725/draw_fixed.png).
+- Bumpy asphalt shows irregular dark repairs, cracks, body dust and loose chips; gravel shows multiscale aggregate, tan vehicle dust, rounded stones and a dust plume. Mud now starts clean and progresses through a strong brown body, accents, wheels and ten instanced splatters. The current 65% progress capture reports 94.1% accumulation and 0.891 splatter opacity while the effect pool remains at one pass, 48 particles and 20 details: [current Mud proof](../evidence/screenshots/mud_optimized_20260726.png).
+- The player flag keeps offline authority running. The overlay first shows exact completed times and `LIVE CLASSIFICATION • 5/12 COMPLETE`, then changes to the exact 12-driver final order with sharing enabled: [live](../evidence/screenshots/surface_results_camera_20260725/results-live.png) and [final](../evidence/screenshots/surface_results_camera_20260725/results-final.png).
+- The chase camera's translation/yaw remain attached while road-grade pitch is eased. Focused abrupt 24-degree climb and 18-degree descent steps verify a bounded first frame, eventual convergence, and no position lag; cockpit presentation is unchanged.
+- The Studio `DRAW TRACK` / `WORLD & ROAD` selector is visually separate from Undo/Redo, keeps 48 px touch targets, and the World tab exposes the road surface first: [current proof](../evidence/screenshots/road_surfaces_20260725/world_and_road.png). The old grid-position review page and MOVE GRID button no longer exist; the safest viable grid is selected automatically before the direct tour transition.
 
 | Tier/view | Avg FPS | p95 | p99 | Max | Draws | Objects | Primitives | Evidence |
 |---|---:|---:|---:|---:|---:|---:|---:|---|
@@ -44,24 +47,26 @@ The optimized renderer, unusual-track catalog, gravity airtime, exact screenshot
 
 All four strict fixtures measured 660 frames with all 11 opponents within 30 m and passed average/p95/p99/max-frame limits. Mobile also stayed below the tightened 300-draw, 600-object, and 300,000-primitive ceilings. These are development-Mac host captures, not physical-device performance evidence.
 
+Three current Mobile Low Mud stresses each measure 660 frames with all 11 opponents inside 30 m. They deliberately drive every player/remote dirt stage during the first 180 measured frames, then retain full coating. Results are 59.2–59.8 average FPS, 16.65–16.66 ms average frame, 17.55–17.65 ms p95, 17.71–17.84 ms p99, and 22.84–23.71 ms maximum, with 203 draws, 535 objects, and at most 250,342 primitives. [Run 1](../evidence/logs/mobile_low_mud_final_run1_20260726.log), [run 2](../evidence/logs/mobile_low_mud_final_run2_20260726.log), and [run 3](../evidence/logs/mobile_low_mud_final_run3_20260726.log). This proves bounded development-host behavior through coating transitions; physical-phone profiling remains open.
+
 ### Current built-in track geometry
 
-Each built-in retains the reviewed 4.0–4.6 km authority target and 44–48 authority-unit width while replacing the earlier oval-like shapes. Saved/custom definitions remain hash-isolated; new Track Studio strokes use fixed 1280×720 logical authority so the same gesture produces byte-identical geometry on phone and desktop layouts.
+Each built-in retains the reviewed 4.0–4.6 km authority target and 44–48 authority-unit width while replacing the earlier oval-like shapes. Saved/custom definitions remain hash-isolated; new Track Studio strokes use fixed 2200×1240 logical authority and a 1.8–5.2 km target range, so the same gesture produces byte-identical geometry on phone and desktop layouts.
 
 | Track | Width | Physical width | Compiled authority length | Physical lap length |
 |---|---:|---:|---:|---:|
 | Evergreen Trident | 48 | 14.4 m | 3,999.921 | 1,199.976 m |
-| Crescent Hammerhead | 46 | 13.8 m | 4,199.756 | 1,259.927 m |
-| Northstar Crown | 46 | 13.8 m | 4,299.515 | 1,289.855 m |
-| River Knot | 47 | 14.1 m | 4,099.681 | 1,229.904 m |
+| Crescent Hammerhead | 46 | 13.8 m | 4,199.653 | 1,259.896 m |
+| Northstar Crown | 46 | 13.8 m | 4,299.948 | 1,289.984 m |
+| River Knot | 47 | 14.1 m | 4,099.627 | 1,229.888 m |
 | Forest Crossing | 46 | 13.8 m | 4,599.896 | 1,379.969 m |
-| Copper Rosette | 44 | 13.2 m | 4,399.507 | 1,319.852 m |
+| Copper Rosette | 44 | 13.2 m | 4,399.972 | 1,319.992 m |
 
-The catalog benchmark passed 166 assertions: six-track cold construction 498.188 ms, compile plus mobile mesh construction 1,633.354 ms, maximum single track 364.755 ms, 120 warm lookups 19.343 ms, maximum 767 samples/460 segments/5,520 triangles. The exact digitized 237-point screenshot silhouette also passed deterministic recovery with 500 output samples, 59.515 minimum radius against 27.000 required, no corner-rounding failure, and byte-identical independent recompiles.
+The catalog benchmark passed 166 assertions: six-track cold construction 475.893 ms, compile plus mobile mesh construction 2,858.724 ms, maximum single track 797.753 ms, 120 warm lookups 18.657 ms, maximum 767 samples/460 segments/5,520 triangles. The exact digitized 237-point screenshot silhouette passed deterministic recovery with 867 output samples and 18.422 minimum radius against 18.000 required. It used the first-choice one-neighbour local rounding pass, 6.689 maximum authority displacement, no harmonic projection, and byte-identical independent recompiles.
 
-All six circuits were audited in both mobile and standard scenery tiers: zero runoff-clearance violations across 12 configurations, minimum clearance 0.500 m, worst barrier/fence skip 10.45%, and maximum venue construction 4,838.471 ms. A separate one-lap 12-car smoke finished 72/72 entries with zero DNF, invalid, non-finite, or stuck outcomes after the steering calibration. Fast valid crests use a bounded 60 Hz ballistic state; flat, low-speed, downhill, cross-deck, recovery, snapshot, interpolation, and legacy-network cases are covered by the race/network/world suites.
+All six circuits were audited in both mobile and standard scenery tiers: zero runoff-clearance violations across 12 configurations, minimum clearance 0.508 m, worst barrier/fence skip 13.89%, and maximum venue construction 4,713.417 ms. A separate one-lap 12-car smoke finished 72/72 entries with zero DNF, invalid, non-finite, or stuck outcomes after the steering and surface calibration. Fast valid crests use a bounded 60 Hz ballistic state; grounded vehicle pitch follows sampled road grade with positive clearance, while airborne pitch follows flight velocity independently. Flat, low-speed, downhill, cross-deck, recovery, snapshot, interpolation, and legacy-network cases are covered by the race/network/world suites.
 
-The high-speed rack endpoint moved only from 0.145 to 0.153 rad (8.31° to 8.77°) and the aerodynamic lateral coefficient from 0.00160 to 0.00168. Actual full-lock radius changes are 101.96→99.26 m at 220 speed, 123.58→119.65 m at 280, and 131.89→127.43 m at 310; low-speed steering, rack rate, gearing, and normalized controls are unchanged, while the top load remains within the existing 7.0 g gate at 6.93 g.
+The high-speed rack endpoint moved only from 0.145 to 0.153 rad (8.31° to 8.77°) and the aerodynamic lateral coefficient from 0.00160 to 0.00168. Actual full-lock radius changes are 101.96→99.26 m at 220 speed, 123.58→119.65 m at 280, and 131.89→127.43 m at 310; low-speed steering, rack rate, gearing, and normalized controls are unchanged, while the top load remains within the existing 7.0 g gate at 6.93 g. A separate five-second launch fixture proves the surface authority ordering: smooth 188.58, weathered 140.44, bumpy 136.65, gravel 83.72, and mud 54.74 speed units.
 
 ## Current combined release-component evidence
 
@@ -202,7 +207,7 @@ Verbose isolation found a cached `TrackDefinition` GDScript reference graph plus
 
 | Gate | Result | Boundary |
 |---|---|---|
-| Deterministic rendering/source fixtures | PASS | Current normal gate: 32 track-rendering, 61 3D-track, 73 all-six scenery, 67 Formula-car, 16 camera, 16 sparks, 99 3D-world, and 71 HUD assertions, plus 13 clean routes and 26 accessibility layouts |
+| Deterministic rendering/source fixtures | PASS | Current normal gate: 32 track-rendering, 70 3D-track, 73 all-six scenery, 75 Formula-car, 22 camera, 16 sparks, 42 surface-effects, 111 3D-world, and 71 HUD assertions, plus 13 clean routes and 26 accessibility layouts |
 | Captured development visuals | PASS—evidence capture only | Current captures cover hand clearance, chase culling, cockpit/chase HUD and safe areas; the Android captures are explicitly from the temporary non-shipping GL smoke build, not a shipping Vulkan runtime PASS |
 | Frozen pixel-diff suite | NOT RUN | No candidate-wide thresholded visual-diff report is recorded |
 | Current development-host AI/load gates | PASS—combined component evidence | Schema-2 full-coverage AI soak passed at 2,084,371 ms and 1,407.6 authority vehicle-steps/s; current 1,011-assertion relay load and 12-check restore passed. No new one-shot `--release` PASS is claimed |

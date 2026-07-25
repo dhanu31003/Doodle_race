@@ -221,9 +221,9 @@ func _case_contract_failures(screen: Control) -> PackedStringArray:
 					or scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_AUTO:
 				output.append("inspector tab is not touch-scroll/focus reachable")
 		if studio._mode_tabs == null or studio._mode_tabs.tab_count != 2 \
-				or studio._mode_tabs.get_tab_title(0) != "DRAW" \
-				or studio._mode_tabs.get_tab_title(1) != "WORLD":
-			output.append("Track Studio does not expose distinct DRAW/WORLD mode tabs")
+				or studio._mode_tabs.get_tab_title(0) != "DRAW TRACK" \
+				or studio._mode_tabs.get_tab_title(1) != "WORLD & ROAD":
+			output.append("Track Studio does not expose distinct DRAW TRACK/WORLD & ROAD sections")
 		else:
 			var selector_rect := studio._mode_tabs.get_global_rect()
 			var content_rect := studio._tabs.get_global_rect()

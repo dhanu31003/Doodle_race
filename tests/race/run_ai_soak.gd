@@ -382,6 +382,7 @@ func _run_spec(
 		progress_state[entry.participant_id] = {
 			"last_progress": entry.classification_progress(),
 			"last_change_tick": 0,
+			"last_recovery_count": entry.automatic_recovery_count,
 			"max_stagnant_ticks": 0,
 			"in_stuck_episode": false,
 			"stuck_episodes": 0,
@@ -404,6 +405,14 @@ func _run_spec(
 				progress_state[entry.participant_id] = monitor
 				continue
 			var progress := entry.classification_progress()
+			# An authority recovery can intentionally move a car backwards to a safe
+			# road sample. Start a fresh progress window there instead of counting the
+			# time spent re-covering that distance as a second stuck episode.
+			if entry.automatic_recovery_count > int(monitor["last_recovery_count"]):
+				monitor["last_recovery_count"] = entry.automatic_recovery_count
+				monitor["last_progress"] = progress
+				monitor["last_change_tick"] = primary.fixed_tick
+				monitor["in_stuck_episode"] = false
 			if progress >= float(monitor["last_progress"]) + PROGRESS_EPSILON:
 				if bool(monitor["in_stuck_episode"]):
 					stuck_recoveries += 1

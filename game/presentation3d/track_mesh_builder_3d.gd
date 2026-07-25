@@ -4,6 +4,10 @@ extends RefCounted
 ## RaceTrackQuery but never changes race authority or creates physics bodies.
 
 const Mapper := preload("res://game/presentation3d/world_coordinate_mapper.gd")
+const RoadSurfaceCatalogType := preload("res://game/content/road_surface_catalog.gd")
+const ROAD_SURFACE_SHADER: Shader = preload(
+	"res://game/presentation3d/shaders/road_surface.gdshader"
+)
 
 const DEFAULT_SAMPLE_STEP_AUTHORITY: float = 6.0
 const MIN_SAMPLE_STEP_AUTHORITY: float = 1.0
@@ -49,12 +53,19 @@ static func build(track: RaceTrackQuery, options: Dictionary = {}) -> Dictionary
 	var sample_step := clampf(
 		requested_step, MIN_SAMPLE_STEP_AUTHORITY, MAX_SAMPLE_STEP_AUTHORITY
 	)
+	var mobile_surface_budget := bool(options.get("mobile_surface_budget", false))
 	var segment_count := clampi(
 		ceili(track.total_length / sample_step), MIN_SEGMENTS, MAX_SEGMENTS
 	)
 	if segment_count <= 0:
 		return _failure(&"segment_count_invalid", "The circuit has no meshable segments.")
 	var exact_step := track.total_length / float(segment_count)
+	var surface_profile := track.surface_profile()
+	var road_color: Color = surface_profile.get("road_color", ASPHALT_COLOR)
+	var runoff_color: Color = surface_profile.get("runoff_color", RUNOFF_COLOR)
+	var texture_repeats := float(surface_profile.get(
+		"uv_repeats_per_meter", ASPHALT_TEXTURE_REPEATS_PER_METER
+	))
 	var road_half_width_m := track.track_width * 0.5 * Mapper.WORLD_UNIT_TO_METERS
 	var runoff_width_m := maxf(
 		RUNOFF_MINIMUM_WIDTH_METERS,
@@ -65,13 +76,13 @@ static func build(track: RaceTrackQuery, options: Dictionary = {}) -> Dictionary
 	var runoff := _build_smooth_ribbon(
 		track, segment_count, exact_step,
 		outer_half_width_m, -outer_half_width_m,
-		RUNOFF_Y_OFFSET_METERS, RUNOFF_COLOR, 0.055
+		RUNOFF_Y_OFFSET_METERS, runoff_color, 0.055
 	)
 	var asphalt := _build_smooth_ribbon(
 		track, segment_count, exact_step,
 		road_half_width_m, -road_half_width_m,
-		ASPHALT_Y_OFFSET_METERS, ASPHALT_COLOR,
-		ASPHALT_TEXTURE_REPEATS_PER_METER
+		ASPHALT_Y_OFFSET_METERS, road_color,
+		texture_repeats
 	)
 	var kerbs := _build_kerb_ribbons(
 		track, segment_count, exact_step, road_half_width_m
@@ -83,10 +94,13 @@ static func build(track: RaceTrackQuery, options: Dictionary = {}) -> Dictionary
 	var mesh := ArrayMesh.new()
 	var surface_stats: Array[Dictionary] = []
 	surface_stats.append(_append_surface(
-		mesh, "runoff", runoff, _standard_material(RUNOFF_COLOR, false, 0.96)
+		mesh, "runoff", runoff, _standard_material(runoff_color, false, 0.96)
 	))
 	surface_stats.append(_append_surface(
-		mesh, "asphalt", asphalt, _asphalt_material()
+		mesh, "asphalt", asphalt, _road_surface_material(
+			surface_profile, road_half_width_m * 2.0, texture_repeats,
+			mobile_surface_budget
+		)
 	))
 	surface_stats.append(_append_surface(
 		mesh, "kerbs", kerbs, _standard_material(Color.WHITE, true, 0.78)
@@ -116,6 +130,9 @@ static func build(track: RaceTrackQuery, options: Dictionary = {}) -> Dictionary
 		"ok": true,
 		"mesh": mesh,
 		"stats": {
+			"road_surface": str(track.road_surface),
+			"road_surface_label": RoadSurfaceCatalogType.display_label(track.road_surface),
+			"mobile_surface_budget": mobile_surface_budget,
 			"segment_count": segment_count,
 			"sample_step_authority": exact_step,
 			"lap_length_authority": track.total_length,
@@ -399,24 +416,74 @@ static func _standard_material(
 	return material
 
 
+
 static func _asphalt_material(
 		diffuse_path: String = ASPHALT_DIFFUSE_TEXTURE_PATH,
-		normal_path: String = ASPHALT_NORMAL_TEXTURE_PATH
+		normal_path: String = ASPHALT_NORMAL_TEXTURE_PATH,
+		profile: Dictionary = {}
 	) -> StandardMaterial3D:
+	var road_color: Color = profile.get("road_color", ASPHALT_COLOR)
+	var material_roughness := float(profile.get("roughness", ASPHALT_TEXTURE_ROUGHNESS))
 	var material := _standard_material(
-		ASPHALT_COLOR, false, ASPHALT_TEXTURE_ROUGHNESS
+		road_color, false, material_roughness
 	)
 	material.texture_repeat = true
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	var diffuse := _load_texture(diffuse_path)
 	if diffuse != null:
-		material.albedo_color = ASPHALT_TEXTURE_TINT
+		material.albedo_color = profile.get("texture_tint", ASPHALT_TEXTURE_TINT)
 		material.albedo_texture = diffuse
 	var normal := _load_texture(normal_path)
 	if normal != null:
 		material.normal_enabled = true
-		material.normal_scale = ASPHALT_NORMAL_SCALE
+		material.normal_scale = float(profile.get("normal_scale", ASPHALT_NORMAL_SCALE))
 		material.normal_texture = normal
+	return material
+
+
+static func _road_surface_material(
+		profile: Dictionary,
+		road_width_meters: float,
+		texture_repeats_per_meter: float,
+		mobile_surface_budget: bool = false
+	) -> Material:
+	var diffuse := _load_texture(ASPHALT_DIFFUSE_TEXTURE_PATH)
+	var normal := _load_texture(ASPHALT_NORMAL_TEXTURE_PATH)
+	if diffuse == null or normal == null or ROAD_SURFACE_SHADER == null:
+		return _asphalt_material(
+			ASPHALT_DIFFUSE_TEXTURE_PATH,
+			ASPHALT_NORMAL_TEXTURE_PATH,
+			profile
+		)
+	var material := ShaderMaterial.new()
+	material.shader = ROAD_SURFACE_SHADER
+	material.set_shader_parameter("road_albedo", diffuse)
+	material.set_shader_parameter("road_normal", normal)
+	material.set_shader_parameter("base_tint", profile.get(
+		"texture_tint", ASPHALT_TEXTURE_TINT
+	))
+	material.set_shader_parameter("dark_tint", profile.get(
+		"detail_dark_color", Color("343b40")
+	))
+	material.set_shader_parameter("light_tint", profile.get(
+		"detail_light_color", Color("e8ecee")
+	))
+	material.set_shader_parameter(
+		"road_uv_width",
+		maxf(road_width_meters * texture_repeats_per_meter, 0.1)
+	)
+	material.set_shader_parameter("roughness_value", float(profile.get(
+		"roughness", ASPHALT_TEXTURE_ROUGHNESS
+	)))
+	material.set_shader_parameter("normal_strength", float(profile.get(
+		"normal_scale", ASPHALT_NORMAL_SCALE
+	)))
+	material.set_shader_parameter("detail_strength", float(profile.get(
+		"visual_detail_strength", 0.0
+	)))
+	var style := StringName(str(profile.get("style", "")))
+	material.set_shader_parameter("surface_style", RoadSurfaceCatalogType.style_index(style))
+	material.set_shader_parameter("mobile_surface_budget", mobile_surface_budget)
 	return material
 
 

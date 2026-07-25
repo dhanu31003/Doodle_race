@@ -17,6 +17,7 @@ func _run() -> void:
 	_test_coordinate_contract(test)
 	_test_invalid_track_contract(test)
 	_test_closed_flat_track_mesh(test)
+	_test_surface_material_profiles(test)
 	_test_bridge_elevation_mesh(test)
 	await process_frame
 	var result: Dictionary = test.result("presentation_3d_track_mesh")
@@ -171,36 +172,42 @@ func _test_closed_flat_track_mesh(test: RefCounted) -> void:
 		kerb_material != null and kerb_material.vertex_color_use_as_albedo,
 		"kerb surface consumes deterministic red/white vertex colors"
 	)
-	var asphalt_material := mesh.surface_get_material(1) as StandardMaterial3D
-	test.assert_true(asphalt_material != null, "asphalt surface owns a standard 3D material")
-	if asphalt_material != null:
-		var diffuse_available := ResourceLoader.exists(
-			Builder.ASPHALT_DIFFUSE_TEXTURE_PATH, "Texture2D"
+	var asphalt_material := mesh.surface_get_material(1)
+	test.assert_true(asphalt_material != null, "asphalt surface owns a complete 3D material")
+	var diffuse_available := ResourceLoader.exists(
+		Builder.ASPHALT_DIFFUSE_TEXTURE_PATH, "Texture2D"
+	)
+	var normal_available := ResourceLoader.exists(
+		Builder.ASPHALT_NORMAL_TEXTURE_PATH, "Texture2D"
+	)
+	if asphalt_material is ShaderMaterial:
+		var surface_shader := asphalt_material as ShaderMaterial
+		test.assert_true(
+			surface_shader.get_shader_parameter("road_albedo") != null,
+			"released road shader receives the imported diffuse texture"
 		)
-		var normal_available := ResourceLoader.exists(
-			Builder.ASPHALT_NORMAL_TEXTURE_PATH, "Texture2D"
+		test.assert_true(
+			surface_shader.get_shader_parameter("road_normal") != null,
+			"released road shader receives the imported normal texture"
 		)
 		test.assert_equal(
-			asphalt_material.albedo_texture != null, diffuse_available,
-			"asphalt diffuse loads when imported and otherwise falls back cleanly"
-		)
-		test.assert_equal(
-			asphalt_material.normal_texture != null, normal_available,
-			"asphalt normal loads when imported and otherwise falls back cleanly"
-		)
-		test.assert_equal(
-			asphalt_material.normal_enabled, normal_available,
-			"normal shading is enabled only when the optional normal texture loads"
-		)
-		test.assert_true(asphalt_material.texture_repeat, "asphalt textures repeat at UV seams")
-		test.assert_equal(
-			asphalt_material.texture_filter,
-			BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS,
-			"asphalt uses mipmapped filtering without mobile-costly anisotropy"
+			int(surface_shader.get_shader_parameter("surface_style")), 0,
+			"smooth asphalt selects the clean shader branch"
 		)
 		test.assert_near(
-			asphalt_material.roughness, Builder.ASPHALT_TEXTURE_ROUGHNESS,
-			0.000001, "asphalt retains a dry, physically plausible roughness"
+			float(surface_shader.get_shader_parameter("roughness_value")),
+			Builder.ASPHALT_TEXTURE_ROUGHNESS,
+			0.000001, "smooth asphalt retains a dry, physically plausible roughness"
+		)
+	elif asphalt_material is StandardMaterial3D:
+		var fallback_road := asphalt_material as StandardMaterial3D
+		test.assert_equal(
+			fallback_road.albedo_texture != null, diffuse_available,
+			"fallback asphalt diffuse follows import availability"
+		)
+		test.assert_equal(
+			fallback_road.normal_texture != null, normal_available,
+			"fallback asphalt normal follows import availability"
 		)
 	var fallback_material := Builder._asphalt_material(
 		"res://tests/presentation3d/missing_asphalt_diffuse.jpg",
@@ -283,6 +290,105 @@ func _test_bridge_elevation_mesh(test: RefCounted) -> void:
 	)
 	result.clear()
 	fixture.clear()
+
+
+func _test_surface_material_profiles(test: RefCounted) -> void:
+	var smooth_fixture := _compiled_query("builtin-evergreen-oval")
+	var gravel_fixture := _compiled_query("builtin-copper-canyon")
+	var mud_fixture := _compiled_query("builtin-riverbend")
+	test.assert_true(
+		bool(smooth_fixture.get("valid", false))
+			and bool(gravel_fixture.get("valid", false))
+			and bool(mud_fixture.get("valid", false)),
+		"released surface material fixtures compile"
+	)
+	if not bool(smooth_fixture.get("valid", false)) \
+			or not bool(gravel_fixture.get("valid", false)) \
+			or not bool(mud_fixture.get("valid", false)):
+		return
+	var smooth := Builder.build(smooth_fixture["query"])
+	var gravel := Builder.build(gravel_fixture["query"])
+	var mud := Builder.build(mud_fixture["query"])
+	var mobile_mud := Builder.build(
+		mud_fixture["query"], {"mobile_surface_budget": true}
+	)
+	test.assert_true(
+		bool(smooth.get("ok", false)) and bool(gravel.get("ok", false)) \
+			and bool(mud.get("ok", false)) and bool(mobile_mud.get("ok", false)),
+		"smooth, gravel, desktop mud, and mobile mud build complete 3D meshes"
+	)
+	if not bool(smooth.get("ok", false)) or not bool(gravel.get("ok", false)) \
+			or not bool(mud.get("ok", false)) or not bool(mobile_mud.get("ok", false)):
+		return
+	var smooth_mesh: ArrayMesh = smooth["mesh"]
+	var gravel_mesh: ArrayMesh = gravel["mesh"]
+	var mud_mesh: ArrayMesh = mud["mesh"]
+	var mobile_mud_mesh: ArrayMesh = mobile_mud["mesh"]
+	var smooth_road := smooth_mesh.surface_get_material(1) as ShaderMaterial
+	var gravel_road := gravel_mesh.surface_get_material(1) as ShaderMaterial
+	var mud_road := mud_mesh.surface_get_material(1) as ShaderMaterial
+	var mobile_mud_road := mobile_mud_mesh.surface_get_material(1) as ShaderMaterial
+	test.assert_true(
+		smooth_road != null and gravel_road != null and mud_road != null \
+				and mobile_mud_road != null,
+		"each surface owns an inspectable road material"
+	)
+	if smooth_road != null and gravel_road != null and mud_road != null \
+			and mobile_mud_road != null:
+		test.assert_true(
+			smooth_road.get_shader_parameter("base_tint") \
+				!= gravel_road.get_shader_parameter("base_tint") \
+				and gravel_road.get_shader_parameter("base_tint") \
+				!= mud_road.get_shader_parameter("base_tint"),
+			"asphalt, gravel, and mud have visibly distinct material tints"
+		)
+		test.assert_true(
+			float(mud_road.get_shader_parameter("roughness_value")) \
+				> float(smooth_road.get_shader_parameter("roughness_value")),
+			"mud has a rougher material response than smooth asphalt"
+		)
+		test.assert_true(
+			float(gravel_road.get_shader_parameter("normal_strength")) \
+				> float(smooth_road.get_shader_parameter("normal_strength")) \
+				and float(mud_road.get_shader_parameter("normal_strength")) \
+				> float(gravel_road.get_shader_parameter("normal_strength")),
+			"loose surfaces progressively strengthen the road normal texture"
+		)
+		test.assert_equal(
+			int(gravel_road.get_shader_parameter("surface_style")), 3,
+			"gravel selects its aggregate shader branch"
+		)
+		test.assert_equal(
+			int(mud_road.get_shader_parameter("surface_style")), 4,
+			"mud selects its rut and damp-patch shader branch"
+		)
+		test.assert_true(
+			bool(mobile_mud["stats"].get("mobile_surface_budget", false))
+					and bool(mobile_mud_road.get_shader_parameter("mobile_surface_budget")),
+			"mobile mud explicitly selects the low-ALU no-normal-sample shader branch"
+		)
+	var smooth_uvs: PackedVector2Array = smooth_mesh.surface_get_arrays(1)[Mesh.ARRAY_TEX_UV]
+	var gravel_uvs: PackedVector2Array = gravel_mesh.surface_get_arrays(1)[Mesh.ARRAY_TEX_UV]
+	test.assert_true(
+		_maximum_uv_y(gravel_uvs) / float(gravel["stats"]["lap_length_meters"]) \
+			> _maximum_uv_y(smooth_uvs) / float(smooth["stats"]["lap_length_meters"]),
+		"gravel uses a denser texture repeat than smooth asphalt"
+	)
+	test.assert_equal(
+		str(gravel["stats"]["road_surface"]), "compact_gravel",
+		"mesh diagnostics retain the authoritative gravel profile"
+	)
+	test.assert_equal(
+		str(mud["stats"]["road_surface"]), "mud",
+		"mesh diagnostics retain the authoritative mud profile"
+	)
+
+
+func _maximum_uv_y(uvs: PackedVector2Array) -> float:
+	var maximum := 0.0
+	for uv in uvs:
+		maximum = maxf(maximum, uv.y)
+	return maximum
 
 
 func _all_surface_front_faces_match_normals(mesh: ArrayMesh) -> bool:

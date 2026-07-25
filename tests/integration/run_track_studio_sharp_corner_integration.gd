@@ -6,6 +6,9 @@ const TestCaseType := preload("res://tests/support/test_case.gd")
 const GameLimitsType := preload("res://game/config/game_limits.gd")
 const TrackStudioType := preload("res://game/ui/screens/track_studio.gd")
 const TrackCompilerType := preload("res://game/track/generation/track_compiler.gd")
+const TrackQueryType := preload("res://game/race/track_query.gd")
+const TrackMeshBuilderType := preload("res://game/presentation3d/track_mesh_builder_3d.gd")
+const RoadSurfaceCatalogType := preload("res://game/content/road_surface_catalog.gd")
 
 
 class InMemoryTrackServices extends RefCounted:
@@ -54,17 +57,36 @@ func _run() -> void:
 	)
 	screen.canvas.track_changed.emit(screen.canvas.points.size(), true)
 	screen.name_field.text = "Automatic Hairpin Recovery"
+	screen.surface_option.select(RoadSurfaceCatalogType.style_index(
+		RoadSurfaceCatalogType.BUMPY_ASPHALT
+	))
 	test.assert_false(screen.confirm_button.disabled, "closed angular stroke enables BUILD CIRCUIT")
+	test.assert_true(
+		screen.find_child("MoveGridHere", true, false) == null
+				and screen.find_child("GridPositionReview", true, false) == null,
+		"Track Studio contains no manual grid-position review page or accept button"
+	)
 	screen._confirm_track()
-	if screen._pending_start_fix_definition != null:
-		screen._accept_start_fix()
 	await process_frame
 	var route_payload: Dictionary = navigation["payload"]
-	test.assert_equal(navigation["route"], "tour", "BUILD CIRCUIT proceeds to the circuit tour without a redraw; status=%s pending_grid=%s" % [screen.status_label.text, str(screen._pending_start_fix_definition != null)])
+	test.assert_equal(navigation["route"], "tour", "BUILD CIRCUIT automatically places the grid and proceeds to the circuit tour without a review page; status=%s" % screen.status_label.text)
 	test.assert_true(service.saved_definition != null, "successful build persists the recovered definition")
 	test.assert_true(bool(route_payload.get("auto_smoothed", false)), "tour payload records automatic corner rounding")
 	test.assert_true("rounded automatically" in screen.status_label.text.to_lower(), "Studio presents rounding as a non-error build note")
 	if service.saved_definition != null:
+		test.assert_equal(
+			service.saved_definition.road_surface,
+			RoadSurfaceCatalogType.BUMPY_ASPHALT,
+			"selecting Bumpy in WORLD persists the requested surface"
+		)
+		var routed_definition := TrackDefinition.from_json(str(
+			route_payload.get("track_definition_json", "")
+		))
+		test.assert_equal(
+			routed_definition.road_surface,
+			RoadSurfaceCatalogType.BUMPY_ASPHALT,
+			"tour and race configuration receive the selected Bumpy surface"
+		)
 		var compiled := TrackCompilerType.compile(service.saved_definition)
 		var repeated := TrackCompilerType.compile(service.saved_definition.copy())
 		test.assert_true(compiled.succeeded(), "saved sharp circuit recompiles cleanly: %s" % str(compiled.report.to_dictionary()))
@@ -79,13 +101,46 @@ func _run() -> void:
 			)
 			var measured := _minimum_finite_radius(compiled.track.radii)
 			test.assert_true(measured >= required, "saved centerline meets the physical radius envelope")
-			test.assert_equal(_auto_smoothing_detail(compiled, "fallback_method"), "harmonic_projection", "dense unusual loop uses the deterministic safe fallback")
+			test.assert_equal(
+				_auto_smoothing_detail(compiled, "fallback_method"), "local_corner_rounding",
+				"dense unusual loop keeps its detailed silhouette through local fairing"
+			)
+			test.assert_true(
+				int(_auto_smoothing_detail(compiled, "fairing_radius_samples")) == 1
+						and float(_auto_smoothing_detail(compiled, "maximum_displacement"))
+								<= service.saved_definition.track_width * 0.25,
+				"automatic point rounding uses a tightly bounded local fairing radius"
+			)
 			test.assert_false(compiled.report.has_code(&"geometry.road_surface_overlap"), "safe fallback leaves no near-parallel road overlap")
 			test.assert_true(compiled.track.centerline[0].distance_to(compiled.track.centerline[-1]) <= compiled.track.sample_spacing * 1.75, "recovered route remains closed at its seam")
 			if repeated.track != null:
 				test.assert_equal(compiled.track.centerline, repeated.track.centerline, "reported loop recovery is byte-deterministic")
-			print("SHARP_CORNER_PROOF source=screenshot-tangled-loop input_points=%d samples=%d minimum_radius=%.3f required_radius=%.3f harmonics=%d compile_hash=%s" % [
+			var query := TrackQueryType.from_compiled(compiled.track)
+			var mesh_result := TrackMeshBuilderType.build(query)
+			test.assert_true(
+				bool(mesh_result.get("ok", false)),
+				"persisted Bumpy circuit builds its complete race mesh"
+			)
+			if bool(mesh_result.get("ok", false)):
+				var mesh: ArrayMesh = mesh_result["mesh"]
+				var road_material := mesh.surface_get_material(1) as ShaderMaterial
+				test.assert_true(
+					road_material != null,
+					"Bumpy race mesh uses the released surface shader"
+				)
+				if road_material != null:
+					test.assert_equal(
+						int(road_material.get_shader_parameter("surface_style")), 2,
+						"Bumpy selection activates repaired-slab and crack visuals"
+					)
+					test.assert_true(
+						float(road_material.get_shader_parameter("detail_strength")) >= 0.9,
+						"Bumpy visual treatment is intentionally conspicuous"
+					)
+			print("SHARP_CORNER_PROOF source=screenshot-tangled-loop input_points=%d samples=%d minimum_radius=%.3f required_radius=%.3f displacement=%.3f fairing_radius=%d harmonics=%d compile_hash=%s" % [
 				screen.canvas.points.size(), compiled.track.centerline.size(), measured, required,
+				float(_auto_smoothing_detail(compiled, "maximum_displacement")),
+				int(_auto_smoothing_detail(compiled, "fairing_radius_samples")),
 				int(_auto_smoothing_detail(compiled, "fallback_harmonics")),
 				compiled.track.compile_hash
 			])

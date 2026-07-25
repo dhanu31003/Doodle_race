@@ -12,7 +12,6 @@ func run() -> Dictionary:
 	_test_explicit_gap_acceptance(test)
 	_test_unsafe_gap_rejected(test)
 	_test_exact_demo_needs_no_fix(test)
-	_test_grid_move_preview_is_visual_only(test)
 	_test_thumbnail_fit_is_bounded_and_aspect_safe(test)
 	_test_edit_identity_never_overwrites_new_name(test)
 	_test_authority_is_device_size_independent(test)
@@ -61,20 +60,6 @@ func _test_exact_demo_needs_no_fix(test: RefCounted) -> void:
 	canvas.free()
 
 
-func _test_grid_move_preview_is_visual_only(test: RefCounted) -> void:
-	var canvas := TrackCanvasType.new()
-	canvas.size = Vector2(800.0, 500.0)
-	canvas.points = _near_closed_loop(20)
-	var authored := canvas.points.duplicate()
-	canvas.show_start_fix_preview(Vector2(110.0, 90.0), Vector2(620.0, 360.0))
-	test.assert_true(canvas.has_start_fix_preview(), "grid proposal is exposed as a review overlay")
-	test.assert_equal(canvas.points, authored, "grid proposal never mutates authored road points")
-	canvas.clear_start_fix_preview()
-	test.assert_false(canvas.has_start_fix_preview(), "grid review overlay can be rejected cleanly")
-	test.assert_equal(canvas.points, authored, "rejecting grid proposal preserves authored road points")
-	canvas.free()
-
-
 func _test_thumbnail_fit_is_bounded_and_aspect_safe(test: RefCounted) -> void:
 	var source := PackedVector2Array([
 		Vector2(-100.0, 20.0),
@@ -111,8 +96,7 @@ func _test_edit_identity_never_overwrites_new_name(test: RefCounted) -> void:
 	test.assert_equal(edited.author_id, previous.author_id, "editing retains author identity")
 	test.assert_equal(edited.created_at_timestamp, previous.created_at_timestamp, "editing retains original creation time")
 	test.assert_equal(edited.deterministic_seed, previous.deterministic_seed, "editing retains deterministic seed")
-	test.assert_near(edited.start_finish_distance, previous.start_finish_distance, 0.0001, "editing preserves the authored grid before explicit review")
-	test.assert_near(TrackStudioType.proposal_preview_distance(321.5, 555.0), 233.5, 0.0001, "grid proposal preview converts absolute distance into current-route distance")
+	test.assert_near(edited.start_finish_distance, previous.start_finish_distance, 0.0001, "editing preserves the authored grid until automatic best-section placement")
 
 
 func _test_authority_is_device_size_independent(test: RefCounted) -> void:
