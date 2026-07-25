@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "project": "RaceGlyph",
+  "inventory_date": "2026-07-24",
+  "license_id": "LicenseRef-RaceGlyph-Original",
+	"license_summary": "Original project asset inventory only. Third-party CC0 environment and trackside foundations are recorded separately in assets/licenses/third-party-assets.json. No external trademarks, sponsor marks, fonts, vehicle geometry, textures, or liveries were incorporated in the project-original Formula car. Generated concept rasters were created specifically for this project, visually reviewed before integration, and preserve no protected branding from visual references.",
+  "asset_groups": [
+    {
+      "name": "visual identity and design tokens",
+      "paths": [
+        "assets/source/design_tokens.json",
+        "assets/source/brand/raceglyph_mark_master.svg",
+        "assets/final/brand/raceglyph_mark.svg",
+        "assets/final/brand/raceglyph_boot_splash.png",
+        "assets/final/brand/raceglyph_ios_app_icon.svg",
+        "assets/final/brand/raceglyph_ios_app_icon.jpg",
+        "assets/final/brand/raceglyph_adaptive_background.svg",
+        "assets/final/brand/raceglyph_adaptive_foreground.svg",
+        "assets/final/brand/raceglyph_adaptive_monochrome.svg"
+      ],
+      "created_by": "RaceGlyph project",
+      "origin": "original",
+      "authoring_method": "Hand-authored project JSON and SVG path geometry",
+      "external_source": null,
+      "license": "LicenseRef-RaceGlyph-Original"
+    },
+    {
+      "name": "formula car family",
+      "paths": [
+        "assets/source/vehicles/formula_car_master.svg",
+        "assets/final/vehicles/car_prime.svg",
+        "assets/final/vehicles/car_aurora.svg",
+        "assets/final/vehicles/car_cinder.svg",
+        "assets/final/vehicles/car_jade.svg",
+        "assets/final/vehicles/car_solar.svg",
+        "assets/final/vehicles/car_violet.svg",
+        "assets/final/vehicles/car_tide.svg",
+        "assets/final/vehicles/car_rose.svg"
+      ],
+      "created_by": "RaceGlyph project",
+      "origin": "original",
+      "authoring_method": "Hand-authored SVG geometry with fictional project colorways",
+      "external_source": null,
+      "license": "LicenseRef-RaceGlyph-Original"
+    },
+    {
+		"name": "premium Formula car 3D body",
+		"paths": [
+			"assets/source/vehicles/generate_premium_formula_car.py",
+			"assets/source/vehicles/formula_car_premium_original_PROVENANCE.md",
+			"assets/final/3d/vehicles/formula_car_premium_original.glb"
+		],
+		"created_by": "RaceGlyph project",
+		"origin": "original",
+		"created_at": "2026-07-24",
+		"authoring_method": "Clean-room procedural Blender 4.5.12 LTS mesh generated from primitives and project-authored numeric vertex profiles; Godot adds original moving wheels, brakes, suspension, halo, driver, steering wheel, dashboard, and animation",
+		"external_source": null,
+		"license": "LicenseRef-RaceGlyph-Original",
+		"source_sha256": "5a555fe37ac632c7d5d9ab2f53a23f0109280d7e004ee0b770e0b31027122c4b",
+		"runtime_sha256": "fb03713f65e108122b7d97f4999503a7f76aa3cc7cb0afbc60ae301919afcb61",
+		"external_geometry_or_textures": false,
+		"trademark_review": "No logos, sponsor marks, team identity, real livery, or copied texture; final protected-design similarity review remains required"
+	},
+    {
+      "name": "formula car design concept",
+      "paths": [
+        "assets/generated/concepts/formula_car_design_reference_v1.metadata.json",
+        "assets/generated/concepts/formula_car_design_reference_v1.png"
+      ],
+      "created_by": "RaceGlyph project",
+      "origin": "original",
+      "authoring_method": "OpenAI built-in image generation from a project-specific prompt. A user-supplied vehicle photograph informed only generic Formula-car proportions and aerodynamic complexity; protected branding, text, livery, team identity, and exact design were explicitly excluded. Prompt and checksum are preserved in the adjacent metadata file.",
+      "external_source": null,
+      "license": "LicenseRef-RaceGlyph-Original"
+    },
+    {
+      "name": "interface icon family",
+      "paths": [
+        "assets/final/ui/icon_draw.svg",
+        "assets/final/ui/icon_undo.svg",
+        "assets/final/ui/icon_redo.svg",
+        "assets/final/ui/icon_clear.svg",
+        "assets/final/ui/icon_play.svg",
+        "assets/final/ui/icon_pause.svg",
+        "assets/final/ui/icon_settings.svg",
+        "assets/final/ui/icon_multiplayer.svg",
+        "assets/final/ui/icon_boost.svg",
+        "assets/final/ui/icon_confirm.svg"
+      ],
+      "created_by": "RaceGlyph project",
+      "origin": "original",
+      "authoring_method": "Hand-authored SVG path geometry on a shared 64-unit grid",
+      "external_source": null,
+      "license": "LicenseRef-RaceGlyph-Original"
+    },
+    {
+      "name": "natural circuit scenery foundation",
+      "paths": [
+        "assets/final/scenery/tree_canopy.svg",
+        "assets/final/scenery/grandstand.svg",
+        "assets/final/scenery/pit_building.svg",
+        "assets/final/scenery/track_gantry.svg",
+        "assets/final/scenery/modular_barrier.svg"
+      ],
+      "created_by": "RaceGlyph project",
+      "origin": "original",
+      "authoring_method": "Hand-authored SVG geometry using the project palette and lighting rules",
+      "external_source": null,
+      "license": "LicenseRef-RaceGlyph-Original"
+    },
+    {
+      "name": "splash and store key art",
+      "paths": [
+        "assets/generated/key_art/raceglyph_splash_concept_v1.metadata.json",
+        "assets/generated/key_art/raceglyph_splash_concept_v1.png",
+        "assets/final/brand/raceglyph_splash.webp"
+      ],
+      "created_by": "RaceGlyph project",
+      "origin": "original",
+      "authoring_method": "Project-specific text prompt, visual inspection, and lossless source preservation; runtime copy stripped and WebP-compressed",
+      "external_source": null,
+      "license": "LicenseRef-RaceGlyph-Original"
+    },
+    {
+      "name": "procedurally synthesized original audio",
+      "paths": [
+        "assets/final/audio/original-audio-manifest.json",
+        "assets/final/audio/menu_loop.wav",
+        "assets/final/audio/race_loop.wav",
+        "assets/final/audio/engine_loop.wav",
+        "assets/final/audio/forest_ambience.wav",
+        "assets/final/audio/countdown.wav",
+        "assets/final/audio/go.wav",
+        "assets/final/audio/click.wav",
+        "assets/final/audio/confirm.wav",
+        "assets/final/audio/error.wav",
+        "assets/final/audio/boost.wav",
+        "assets/final/audio/skid.wav",
+        "assets/final/audio/collision.wav",
+        "assets/final/audio/lap.wav",
+        "assets/final/audio/finish.wav"
+      ],
+      "created_by": "RaceGlyph project",
+      "origin": "original",
+      "authoring_method": "Deterministic procedural synthesis from mathematical oscillators and fixed-seed noise using tools/audio/generate_original_audio.py; no recordings, sample packs, or external melodies",
+      "external_source": null,
+      "license": "LicenseRef-RaceGlyph-Original"
+    }
+  ]
+}

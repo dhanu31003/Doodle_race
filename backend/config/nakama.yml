@@ -1,0 +1,20 @@
+name: raceglyph-local
+data_dir: /nakama/data
+
+logger:
+  level: INFO
+  stdout: true
+  format: JSON
+
+session:
+  token_expiry_sec: 7200
+  refresh_token_expiry_sec: 2592000
+
+socket:
+  # Nakama's realtime request wraps match data as base64 JSON. Keep transport
+  # headroom while the runtime module enforces RaceGlyph's 65,536-byte raw cap.
+  max_message_size_bytes: 131072
+  max_request_size_bytes: 131072
+
+runtime:
+  path: /nakama/data/modules

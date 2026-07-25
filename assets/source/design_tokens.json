@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "identity": {
+    "working_title": "RaceGlyph",
+    "visual_theme": "precision racing meets playful track sketching",
+    "logo_rule": "Use the glyph without sponsor marks, lettering, or real-world racing references."
+  },
+  "palette": {
+    "ink_950": "#07111B",
+    "ink_900": "#0A1724",
+    "ink_800": "#122638",
+    "ink_700": "#1B3448",
+    "slate_500": "#597386",
+    "mist_100": "#DCEAF2",
+    "paper_050": "#F4FBFF",
+    "white": "#FFFFFF",
+    "glyph_cyan": "#38E4D7",
+    "glyph_cyan_dark": "#148A91",
+    "signal_orange": "#FFB14A",
+    "signal_red": "#FF5A5F",
+    "success_green": "#32D583",
+    "electric_blue": "#34D6FF",
+    "violet": "#A970FF",
+    "rose": "#FF6FAE",
+    "asphalt": "#2B3540",
+    "grass_dark": "#23523B",
+    "grass_mid": "#347A50",
+    "grass_light": "#57A568"
+  },
+  "team_colorways": {
+    "prime": {"primary": "#F4FBFF", "secondary": "#38E4D7", "accent": "#FFB14A"},
+    "aurora": {"primary": "#34D6FF", "secondary": "#1259A9", "accent": "#F4FBFF"},
+    "cinder": {"primary": "#FF5A5F", "secondary": "#9E1B32", "accent": "#FFB14A"},
+    "jade": {"primary": "#32D583", "secondary": "#0B6B4B", "accent": "#F4FBFF"},
+    "solar": {"primary": "#FFC857", "secondary": "#E36B19", "accent": "#182236"},
+    "violet": {"primary": "#A970FF", "secondary": "#5131A8", "accent": "#FF78C6"},
+    "tide": {"primary": "#29B6A6", "secondary": "#146C82", "accent": "#F4FBFF"},
+    "rose": {"primary": "#FF6FAE", "secondary": "#A72E6A", "accent": "#79F0E0"}
+  },
+  "geometry": {
+    "ui_icon_view_box": "0 0 64 64",
+    "ui_stroke_width": 4,
+    "ui_stroke_cap": "round",
+    "car_view_box": "0 0 128 192",
+    "car_forward_direction": "negative_y",
+    "minimum_icon_safe_area": 8
+  },
+  "lighting": {
+    "key_direction": "upper_left",
+    "highlight_color": "#FFFFFF",
+    "highlight_opacity": 0.28,
+    "shadow_color": "#06111B",
+    "shadow_offset": [5, 7],
+    "shadow_opacity": 0.28
+  },
+  "usage": {
+    "transparent_canvas": true,
+    "minimum_touch_target_px": 48,
+    "minimum_body_contrast_ratio": 4.5,
+    "small_size_rule": "Preserve silhouette and primary accent; decorative seams may be hidden below 24 px."
+  }
+}

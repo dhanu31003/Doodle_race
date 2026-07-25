@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "project": "RaceGlyph",
+  "inventory_date": "2026-07-24",
+  "asset_groups": [
+    {
+		"id": "RG-ARCHIVE-001",
+		"name": "Unused legacy CC0 Formula race car research source",
+      "creator": "mabaci",
+      "source_page": "https://opengameart.org/content/free-low-poly-3d-race-car-model-%F0%9F%8F%8D%EF%B8%8F%F0%9F%8F%81%F0%9F%9A%A6%F0%9F%8F%86",
+      "download_url": "https://opengameart.org/sites/default/files/racecar.zip",
+      "retrieved_at": "2026-07-24",
+      "license": "CC0-1.0",
+      "license_proof": "assets/licenses/third_party/cc0_formula_racecar_LICENSE.txt",
+      "source_archive": "assets/source/third_party/cc0_formula_racecar.zip",
+      "source_archive_sha256": "c3ac7d804e1d809c32110a3e69d7139b834a0aaf8cf75a0565389f6a98712b69",
+      "source_paths": [
+        "assets/source/third_party/cc0_formula_racecar/"
+      ],
+		"runtime_paths": [
+			"assets/final/3d/vehicles/formula_car_cc0.glb",
+			"assets/final/3d/vehicles/formula_car_cc0.glb.import",
+			"assets/final/3d/vehicles/formula_car_cc0_color palette.png",
+			"assets/final/3d/vehicles/formula_car_cc0_color palette.png.import"
+		],
+      "runtime_sha256": {
+		"assets/final/3d/vehicles/formula_car_cc0.glb": "acdf4965d7523dfbc729a25a66ef7c7ed92c57132c8cb6ecf930531914094af3",
+		"assets/final/3d/vehicles/formula_car_cc0_color palette.png": "366549382c3a59506cc6504df052b41fd49f1d1fae1b9270c569d65794732d54"
+      },
+		"modifications": "Legacy GLB copied from the source archive during research and retained only for reproducibility. It is not referenced or instantiated by the game; the shipped Formula-car contract uses the project-original premium GLB recorded in assets/licenses/original-assets.json.",
+		"runtime_used": false,
+      "attribution_required": false,
+      "attribution_text": "Formula race car base by mabaci, dedicated to the public domain under CC0 1.0.",
+      "status": "CLEARED"
+    },
+    {
+      "id": "RG-3D-002",
+      "name": "Racing Kit 1.2 trackside props",
+      "creator": "Kenney",
+      "source_page": "https://opengameart.org/content/racing-kit",
+      "download_url": "https://opengameart.org/sites/default/files/Racing%20Kit%20%281.2%29.zip",
+      "retrieved_at": "2026-07-24",
+      "license": "CC0-1.0",
+      "license_proof": "assets/licenses/third_party/kenney_racing_kit_LICENSE.txt",
+      "source_archive": "assets/source/third_party/kenney_racing_kit_1_2.zip",
+      "source_archive_sha256": "103acf8a85a04e94e2d3a9933fbcea12e9422c14d5e364eb013019a882af7f48",
+      "source_paths": [
+        "assets/source/third_party/kenney_racing_kit_1_2/",
+        "assets/source/third_party/.gdignore"
+      ],
+      "runtime_paths": [
+        "assets/final/3d/trackside/kenney_racing/"
+      ],
+      "modifications": "Selected unbranded GLTF props and their dependent BIN/PNG files are copied for deterministic world-space scenery. Runtime placement, palette, scale, shadows, and density are authored by RaceGlyph. Tankco-named promotional props are not referenced by the game.",
+      "attribution_required": false,
+      "attribution_text": "Racing Kit 1.2 by Kenney, dedicated to the public domain under CC0 1.0.",
+      "status": "CLEARED"
+    },
+    {
+      "id": "RG-3D-003",
+      "name": "Clean Asphalt 1K PBR material",
+      "creator": "Dimitrios Savva",
+      "source_page": "https://polyhaven.com/a/clean_asphalt",
+      "download_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/clean_asphalt/clean_asphalt_diff_1k.jpg",
+      "retrieved_at": "2026-07-24",
+      "license": "CC0-1.0",
+      "license_proof": "assets/licenses/third_party/poly_haven_CC0-1.0_legalcode.txt",
+      "source_files": {
+        "assets/final/3d/materials/clean_asphalt_diff_1k.jpg": "ddf9224e9cfa3eb2998d9097e4cd34bd3630c85e0e6798e5a0a000415a684083",
+        "assets/final/3d/materials/clean_asphalt_nor_gl_1k.jpg": "99cdf6b6f0b8a319d206e1d561bf2a5d9933d8d33e1d685f8e25388101d21310",
+        "assets/final/3d/materials/clean_asphalt_arm_1k.jpg": "dedb9a28ebadd2848856af8672eeabed1286b5729c3387c0734efa66819dbed3"
+      },
+      "runtime_paths": [
+        "assets/final/3d/materials/"
+      ],
+      "runtime_sha256": {
+        "assets/final/3d/materials/clean_asphalt_diff_1k.jpg": "ddf9224e9cfa3eb2998d9097e4cd34bd3630c85e0e6798e5a0a000415a684083",
+        "assets/final/3d/materials/clean_asphalt_nor_gl_1k.jpg": "99cdf6b6f0b8a319d206e1d561bf2a5d9933d8d33e1d685f8e25388101d21310",
+        "assets/final/3d/materials/clean_asphalt_arm_1k.jpg": "dedb9a28ebadd2848856af8672eeabed1286b5729c3387c0734efa66819dbed3"
+      },
+      "modifications": "Original 1K JPG maps are retained byte-for-byte and tiled on the generated track mesh. The combined ARM map is retained for future mobile material tuning; diffuse and OpenGL normal maps are the initial runtime contract.",
+      "attribution_required": false,
+      "attribution_text": "Clean Asphalt by Dimitrios Savva / Poly Haven, dedicated to the public domain under CC0 1.0.",
+      "status": "CLEARED"
+    },
+    {
+      "id": "RG-3D-004",
+      "name": "Kloofendal 43d Clear Pure Sky 1K HDRI",
+      "creator": "Greg Zaal / Poly Haven",
+      "source_page": "https://polyhaven.com/a/kloofendal_43d_clear_puresky",
+      "download_url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloofendal_43d_clear_puresky_1k.hdr",
+      "retrieved_at": "2026-07-24",
+      "license": "CC0-1.0",
+      "license_proof": "assets/licenses/third_party/poly_haven_CC0-1.0_legalcode.txt",
+      "source_files": {
+        "assets/final/3d/environment/kloofendal_43d_clear_puresky_1k.hdr": "de7ba9d0b070470dbb70d0144294c8708068df353537b26ab59c394707e84377"
+      },
+      "runtime_paths": [
+        "assets/final/3d/environment/"
+      ],
+      "runtime_sha256": {
+        "assets/final/3d/environment/kloofendal_43d_clear_puresky_1k.hdr": "de7ba9d0b070470dbb70d0144294c8708068df353537b26ab59c394707e84377"
+      },
+      "modifications": "The original 1K HDR is retained byte-for-byte and used as an efficient daylight sky/reflection source. A project-authored directional sun remains the shadow source.",
+      "attribution_required": false,
+      "attribution_text": "Kloofendal 43d Clear Pure Sky by Greg Zaal / Poly Haven, dedicated to the public domain under CC0 1.0.",
+      "status": "CLEARED"
+    },
+    {
+      "id": "RG-3D-005",
+      "name": "Sparse Grass 1K PBR material",
+      "creator": "Amal Kumar / Poly Haven",
+      "source_page": "https://polyhaven.com/a/sparse_grass",
+      "download_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/sparse_grass/sparse_grass_diff_1k.jpg",
+      "retrieved_at": "2026-07-24",
+      "license": "CC0-1.0",
+      "license_proof": "assets/licenses/third_party/poly_haven_CC0-1.0_legalcode.txt",
+      "source_files": {
+        "assets/final/3d/materials/sparse_grass_diff_1k.jpg": "ae94f2b34597b9108eefd88217f55eccaec6d6b382e858a478ee92df90e66617",
+        "assets/final/3d/materials/sparse_grass_nor_gl_1k.jpg": "1c840a24807346ddaaf94a5057aee4078fcec3a4cd84bfe45da7d3b480ef460b"
+      },
+      "runtime_paths": [
+        "assets/final/3d/materials/"
+      ],
+      "runtime_sha256": {
+        "assets/final/3d/materials/sparse_grass_diff_1k.jpg": "ae94f2b34597b9108eefd88217f55eccaec6d6b382e858a478ee92df90e66617",
+        "assets/final/3d/materials/sparse_grass_nor_gl_1k.jpg": "1c840a24807346ddaaf94a5057aee4078fcec3a4cd84bfe45da7d3b480ef460b"
+      },
+      "modifications": "Original 1K JPG diffuse and OpenGL normal maps are retained byte-for-byte, tinted to the RaceGlyph daylight palette, and tiled over the fixed ground plane.",
+      "attribution_required": false,
+      "attribution_text": "Sparse Grass by Amal Kumar / Poly Haven, dedicated to the public domain under CC0 1.0.",
+      "status": "CLEARED"
+    },
+    {
+      "id": "RG-3D-006",
+      "name": "Ultimate Stylized Nature selected trackside vegetation",
+      "creator": "Quaternius",
+      "source_page": "https://quaternius.com/packs/ultimatestylizednature.html",
+      "download_url": "https://drive.google.com/drive/folders/1IV3bXHzkNvuNWFHPi4KPx-G4ghuxIuT-",
+      "retrieved_at": "2026-07-24",
+      "license": "CC0-1.0",
+      "license_proof": "assets/licenses/third_party/quaternius_ultimate_stylized_nature_source_page.html",
+      "bundled_license_text": "assets/licenses/third_party/quaternius_ultimate_stylized_nature_CC0.txt",
+      "source_files": {
+        "assets/licenses/third_party/quaternius_ultimate_stylized_nature_CC0.txt": "de990ef6fc68cffd7fd1ae342c4d0c823b541b8848d8f76bca5d3339f4de6f6e"
+      },
+      "runtime_paths": [
+        "assets/final/3d/trackside/quaternius_nature/"
+      ],
+      "runtime_sha256": {
+        "assets/final/3d/trackside/quaternius_nature/BirchTree_1.bin": "a1b14d1c82ebb8153991de4156b77ceaa1143d64469679147c0ee249c8b90b83",
+        "assets/final/3d/trackside/quaternius_nature/BirchTree_1.gltf": "3c9aea3fd5e205eca68b5391912c7b53c77a8a3813e6cbbc47300e69c2f5d3da",
+        "assets/final/3d/trackside/quaternius_nature/BirchTree_3.bin": "98d3a00145beeab868c0e7eb8dbb1118115cb00a44a8a801244eae837805d602",
+        "assets/final/3d/trackside/quaternius_nature/BirchTree_3.gltf": "f5514b200524647c5e6ec485db98a7708ceb6b76182b40afdf6d80f7cb2a9418",
+        "assets/final/3d/trackside/quaternius_nature/BirchTree_Bark.jpg": "5087076e0bf2840869f8232a4c8c596114b424adc267a39cd78e5d950b401fa3",
+        "assets/final/3d/trackside/quaternius_nature/BirchTree_Bark_Normal.png": "a8f8fc6d370a61f771547bc5b78213e635482afdab22eb9af45dcd4a481f95e0",
+        "assets/final/3d/trackside/quaternius_nature/BirchTree_Leaves.png": "e9f474108023a82ec3cba048755aa4f3aa72eac42ded2881cf7f2dfb9152e46b",
+        "assets/final/3d/trackside/quaternius_nature/Bush.bin": "c8a583d0741f37ec5e256d8dfc05d82f94689cf93bf3fb7b95e716d1e05ba11f",
+        "assets/final/3d/trackside/quaternius_nature/Bush.gltf": "30cdd957a08f63656fe25d3ecd72ac68f1cf11ba8eb85e8e20279d51d9ebb8ea",
+        "assets/final/3d/trackside/quaternius_nature/Bush_Leaves.png": "29423cda09e6ee8e1478d6c0d8522d196e502a8043f510da14fe0829cfab013d",
+        "assets/final/3d/trackside/quaternius_nature/MapleTree_1.bin": "03cfea606b55f8f38220f2922e28efb92d724abac801f76191ba062c398bf09c",
+        "assets/final/3d/trackside/quaternius_nature/MapleTree_1.gltf": "98a4a8465a8b42d0d00ec13b9ba73f88c952f3dcbf3ad1f4fbed131151097960",
+        "assets/final/3d/trackside/quaternius_nature/MapleTree_3.bin": "c26fd0be6947b3d955a1b64e3f7a57d2d521d652618380d354042621c1b23be1",
+        "assets/final/3d/trackside/quaternius_nature/MapleTree_3.gltf": "e545af0f93a680f920a804ee4918938cafa4a8119b41b8eb403f77bbddc9a3bd",
+        "assets/final/3d/trackside/quaternius_nature/MapleTree_Bark.jpg": "896df3f299e81a91acbac3d6b826fdbcaf1898f50ab1b24849c8f00678fe882c",
+        "assets/final/3d/trackside/quaternius_nature/MapleTree_Bark_Normal.png": "4b2805d3a90b987f07f4d0b2e08f24cbc8345a765da1f8c58eb64f5e2a8ad3fb",
+        "assets/final/3d/trackside/quaternius_nature/MapleTree_Leaves.png": "d7649db5ffbeaa3a327b1d636e59338ab6bfa9c51fb7fa029efcaf72286dbfcd"
+      },
+      "modifications": "Four tree variants and one shrub were selected from the official glTF distribution. Geometry and BIN payloads are unchanged; glTF leaf materials use a project-tuned alpha mask and higher roughness to prevent translucent card shimmer. Referenced bark, normal, and alpha-leaf textures were resized to 512 px and stripped of metadata for a bounded mobile runtime footprint; seasonal leaf colors were retinted to a natural green circuit palette and leaf imports generate mipmaps. Deterministic placement, scale, density, shadow tiering, and clearance validation are authored by RaceGlyph.",
+      "attribution_required": false,
+      "attribution_text": "Ultimate Stylized Nature by Quaternius, dedicated to the public domain under CC0 1.0.",
+      "status": "CLEARED"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "generator_version": 2,
+  "track_id": "fixture-stadium-v1",
+  "track_name": "Golden Stadium",
+  "author_id": "fixture-author",
+  "canvas_size": [1200.0, 800.0],
+  "control_points": [
+    [0.35, 0.75], [0.65, 0.75], [0.78, 0.70], [0.85, 0.58],
+    [0.85, 0.42], [0.78, 0.30], [0.65, 0.25], [0.35, 0.25],
+    [0.22, 0.30], [0.15, 0.42], [0.15, 0.58], [0.22, 0.70],
+    [0.25, 0.75]
+  ],
+  "direction": "counter_clockwise",
+  "target_length": 1600.0,
+  "track_width": 36.0,
+  "theme": "classic",
+  "pit_side": "none",
+  "decoration_density": 0.5,
+  "deterministic_seed": "424242",
+  "bridge_crossings": [],
+  "start_finish_distance": 491.342,
+  "content_hash": "c53133531cf19b19b8b1e9daf687ad919c13a161396c7698fa26788734a4ea8f",
+  "created_at_timestamp": 1784820000,
+  "updated_at_timestamp": 1784820000
+}

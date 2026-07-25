@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 240" role="img" aria-label="RaceGlyph original fictional open-wheel car cinder version 2" data-design-version="2" data-vehicle-class="fictional-open-wheel">
+  <defs>
+    <linearGradient id="body" x1="55" y1="18" x2="105" y2="197" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset=".46" stop-color="#EDF3F5"/>
+      <stop offset="1" stop-color="#B9C5CB"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="58" y1="18" x2="101" y2="211" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFE1E3"/>
+      <stop offset=".58" stop-color="#FF6B72"/>
+      <stop offset="1" stop-color="#FF6B72" stop-opacity=".72"/>
+    </linearGradient>
+    <linearGradient id="carbon" x1="40" y1="38" x2="118" y2="218" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#39424C"/>
+      <stop offset=".42" stop-color="#171D24"/>
+      <stop offset="1" stop-color="#070B10"/>
+    </linearGradient>
+    <linearGradient id="tire" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#252B31"/>
+      <stop offset=".42" stop-color="#080B0F"/>
+      <stop offset=".82" stop-color="#151A20"/>
+      <stop offset="1" stop-color="#030507"/>
+    </linearGradient>
+    <radialGradient id="cockpitShade" cx=".46" cy=".32" r=".74">
+      <stop stop-color="#52616D"/>
+      <stop offset=".46" stop-color="#17212A"/>
+      <stop offset="1" stop-color="#03070B"/>
+    </radialGradient>
+  </defs>
+  <g id="ground-shadow" fill="#02070B" opacity=".34" transform="translate(4 6)">
+    <ellipse cx="80" cy="132" rx="62" ry="99"/>
+  </g>
+  <g id="tires" fill="url(#tire)" stroke="#05080B" stroke-width="3">
+    <rect x="10" y="48" width="29" height="54" rx="11"/>
+    <rect x="121" y="48" width="29" height="54" rx="11"/>
+    <rect x="5" y="157" width="36" height="62" rx="13"/>
+    <rect x="119" y="157" width="36" height="62" rx="13"/>
+    <path d="M17 55V94M143 55V94M13 165V210M147 165V210" fill="none" stroke="#4B555F" stroke-width="3" stroke-linecap="round" opacity=".72"/>
+    <path d="M21 52V98M139 52V98M17 161V215M143 161V215" fill="none" stroke="#FF6B72" stroke-width="2" stroke-linecap="round" opacity=".78"/>
+    <path d="M25 52V98M135 52V98M22 161V215M138 161V215" fill="none" stroke="#FF6B72" stroke-width="1.5" stroke-linecap="round" opacity=".76"/>
+  </g>
+  <g id="floor" fill="url(#carbon)" stroke="#05090D" stroke-width="3" stroke-linejoin="round">
+    <path d="M49 53H111L119 83L129 105L124 162L113 194L107 219H53L47 194L36 162L31 105L41 83Z"/>
+    <path d="M38 112L18 126L20 166L49 180L56 160L51 117ZM122 112L142 126L140 166L111 180L104 160L109 117Z"/>
+  </g>
+  <g id="suspension" fill="none" stroke="#151C23" stroke-width="4" stroke-linecap="round">
+    <path d="M48 64L24 56M47 84L24 94M112 64L136 56M113 84L136 94"/>
+    <path d="M50 169L22 164M49 194L23 210M110 169L138 164M111 194L137 210"/>
+    <path d="M50 66L24 94M110 66L136 94M50 172L23 210M110 172L137 210" stroke="#68737D" stroke-width="1.5" opacity=".7"/>
+  </g>
+  <g id="front-wing" stroke="#060A0E" stroke-linejoin="round">
+    <path d="M9 34L55 30L67 35H93L105 30L151 34L148 47L104 43L94 50H66L56 43L12 47Z" fill="url(#carbon)" stroke-width="3"/>
+    <path d="M13 27L57 24L69 30H91L103 24L147 27L145 34L105 32L94 38H66L55 32L15 34Z" fill="url(#body)" stroke-width="2.5"/>
+    <path d="M16 25L54 22L59 27L16 31ZM144 25L106 22L101 27L144 31Z" fill="#FF6B72" stroke-width="1.5"/>
+    <path d="M9 25L17 23L20 49L10 52ZM151 25L143 23L140 49L150 52Z" fill="#FF6B72" stroke-width="2"/>
+    <path d="M23 38L55 36M137 38L105 36" fill="none" stroke="#FF6B72" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <g id="sidepods" stroke="#0B1117" stroke-width="2.5" stroke-linejoin="round">
+    <path d="M62 87C52 87 43 94 39 107L36 143L45 165L58 173L67 151L68 109Z" fill="url(#body)"/>
+    <path d="M98 87C108 87 117 94 121 107L124 143L115 165L102 173L93 151L92 109Z" fill="url(#body)"/>
+    <path d="M62 104L45 109L43 142L54 157L64 145ZM98 104L115 109L117 142L106 157L96 145Z" fill="url(#carbon)"/>
+    <path d="M42 104C49 97 54 95 62 95M118 104C111 97 106 95 98 95" fill="none" stroke="#FF6B72" stroke-width="5"/>
+    <path d="M42 111L61 102M118 111L99 102" fill="none" stroke="#FF6B72" stroke-width="2.5"/>
+    <path d="M40 149L55 166M120 149L105 166" fill="none" stroke="#FF6B72" stroke-width="3"/>
+  </g>
+  <g id="bodywork" stroke="#0A1016" stroke-width="3" stroke-linejoin="round">
+    <path d="M80 9L90 19L95 50L103 70L101 103L108 127L103 164L94 191L91 213H69L66 191L57 164L52 127L59 103L57 70L65 50L70 19Z" fill="url(#body)"/>
+    <path d="M80 11L87 24L89 57L95 74L93 93L85 85L80 53L75 85L67 93L65 74L71 57L73 24Z" fill="url(#accent)" stroke-width="2"/>
+    <path d="M80 13L82 54L88 79L84 89L80 61L76 89L72 79L78 54Z" fill="#FFFFFF" stroke="none" opacity=".5"/>
+    <path d="M65 52L72 44M95 52L88 44M61 169L72 181M99 169L88 181" fill="none" stroke="#FF6B72" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M66 184L80 174L94 184L91 212H69Z" fill="url(#carbon)" stroke-width="2.5"/>
+    <path d="M70 188L80 181L90 188" fill="none" stroke="#FF6B72" stroke-width="3"/>
+  </g>
+  <g id="cockpit">
+    <path d="M80 79C96 79 102 93 99 117C97 137 91 149 80 149C69 149 63 137 61 117C58 93 64 79 80 79Z" fill="url(#cockpitShade)" stroke="#05090D" stroke-width="3"/>
+    <path d="M68 102C70 91 90 91 92 102L90 129C88 139 72 139 70 129Z" fill="#071018" stroke="#44515C" stroke-width="2"/>
+    <path d="M71 96C75 91 85 91 89 96" fill="none" stroke="#E6F0F2" stroke-width="2" opacity=".46"/>
+  </g>
+  <g id="halo" fill="none" stroke="url(#carbon)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M66 105C67 92 72 86 80 86C88 86 93 92 94 105"/>
+    <path d="M66 105V129M94 105V129M80 88V127"/>
+    <path d="M68 103C72 94 88 94 92 103" stroke="#7D8993" stroke-width="1.5" opacity=".75"/>
+  </g>
+  <g id="diffuser" fill="url(#carbon)" stroke="#05080B" stroke-width="2.5" stroke-linejoin="round">
+    <path d="M45 195L62 188H98L115 195L109 222L95 216H65L51 222Z"/>
+    <path d="M52 198L56 219M65 194L67 218M80 192V218M95 194L93 218M108 198L104 219" fill="none" stroke="#535F69" stroke-width="2"/>
+    <rect x="76" y="202" width="8" height="12" rx="2" fill="#FF3F4A" stroke="#68151B" stroke-width="1.5"/>
+  </g>
+  <g id="rear-wing" stroke="#05090D" stroke-linejoin="round">
+    <path d="M10 210L48 202H112L150 210L147 229L107 220H53L13 229Z" fill="url(#carbon)" stroke-width="3"/>
+    <path d="M15 204L51 197H109L145 204L143 212L109 207H51L17 212Z" fill="url(#body)" stroke-width="2.5"/>
+    <path d="M18 203L50 197H65L58 204L18 210ZM142 203L110 197H95L102 204L142 210Z" fill="#FF6B72" stroke-width="1.5"/>
+    <path d="M10 200L19 198L22 230L12 234ZM150 200L141 198L138 230L148 234Z" fill="#FF6B72" stroke-width="2"/>
+    <path d="M54 208H106" fill="none" stroke="#FF6B72" stroke-width="2.5"/>
+  </g>
+  <g id="surface-highlights" fill="none" stroke-linecap="round">
+    <path d="M58 91L51 98M102 91L109 98M62 155L55 163M98 155L105 163" stroke="#FFFFFF" stroke-width="2.2" opacity=".5"/>
+    <path d="M70 21L74 17L76 48" stroke="#FFFFFF" stroke-width="2.4" opacity=".72"/>
+    <path d="M55 73L46 82M105 73L114 82" stroke="#FF6B72" stroke-width="2.2" opacity=".8"/>
+  </g>
+</svg>

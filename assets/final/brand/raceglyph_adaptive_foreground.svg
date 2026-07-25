@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 432 432">
+  <defs>
+    <linearGradient id="badge" x1="120" y1="88" x2="320" y2="348" gradientUnits="userSpaceOnUse"><stop stop-color="#122638"/><stop offset="1" stop-color="#07111B"/></linearGradient>
+    <linearGradient id="track" x1="130" y1="125" x2="288" y2="310" gradientUnits="userSpaceOnUse"><stop stop-color="#79F0E0"/><stop offset="1" stop-color="#38E4D7"/></linearGradient>
+  </defs>
+  <circle cx="216" cy="216" r="142" fill="#020712" opacity=".28" transform="translate(8 12)"/>
+  <circle cx="216" cy="216" r="142" fill="url(#badge)"/>
+  <path d="M127 238C110 190 137 137 185 121C229 107 282 124 308 164C332 199 327 249 298 281C266 315 212 321 174 293C146 272 144 235 167 214C188 196 219 202 231 225C245 246 236 274 216 284" fill="none" stroke="url(#track)" stroke-width="29" stroke-linecap="round"/>
+  <path d="M262 108L338 119L304 188L286 154L244 138Z" fill="#FFC857"/>
+  <path d="M151 161C171 132 204 117 239 121" fill="none" stroke="#FFFFFF" stroke-opacity=".30" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="308" cy="280" r="16" fill="#F5F8FF"/>
+</svg>

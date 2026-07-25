@@ -1,0 +1,20 @@
+{
+  "services": [
+    {
+      "name": "heroiclabs/nakama",
+      "version": "3.40.0",
+      "image": "registry.heroiclabs.com/heroiclabs/nakama:3.40.0@sha256:92fb184e3271be12fd4d239766afb285322a50aaf769a59433445d59624c78cd",
+      "source": "https://github.com/heroiclabs/nakama",
+      "tag": "v3.40.0",
+      "commit": "d4d92f93f78bbbe62c7fc50a3f85c772ec121a09",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "postgres",
+      "version": "17.9-alpine3.23",
+      "image": "postgres:17.9-alpine3.23@sha256:c7526c0f6c3f30260a563d7bcf8ad778effac59a44f8ffa86678c35418338609",
+      "source": "https://github.com/docker-library/postgres",
+      "license": "PostgreSQL"
+    }
+  ]
+}

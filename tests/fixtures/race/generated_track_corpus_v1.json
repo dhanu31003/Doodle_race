@@ -1,0 +1,27 @@
+{
+  "corpus_id": "raceglyph-generated-track-corpus-v1",
+  "generator": "rounded-loop-harmonic-v1",
+  "track_count": 20,
+  "tracks": [
+    {"id":"corpus-01","seed":1103,"aspect":1.42,"wave":0.02,"lobes":2,"phase":0.13,"shear":0.00,"width":36.0,"target_length":1500.0},
+    {"id":"corpus-02","seed":1297,"aspect":1.30,"wave":0.04,"lobes":3,"phase":0.31,"shear":0.03,"width":35.0,"target_length":1540.0},
+    {"id":"corpus-03","seed":1429,"aspect":1.52,"wave":0.03,"lobes":4,"phase":0.47,"shear":-0.02,"width":36.0,"target_length":1580.0},
+    {"id":"corpus-04","seed":1613,"aspect":1.18,"wave":0.05,"lobes":2,"phase":0.73,"shear":0.04,"width":34.0,"target_length":1460.0},
+    {"id":"corpus-05","seed":1877,"aspect":1.36,"wave":0.04,"lobes":5,"phase":0.19,"shear":-0.03,"width":35.0,"target_length":1620.0},
+    {"id":"corpus-06","seed":2017,"aspect":1.47,"wave":0.05,"lobes":3,"phase":0.59,"shear":0.02,"width":34.0,"target_length":1660.0},
+    {"id":"corpus-07","seed":2237,"aspect":1.25,"wave":0.03,"lobes":4,"phase":0.83,"shear":-0.04,"width":36.0,"target_length":1520.0},
+    {"id":"corpus-08","seed":2473,"aspect":1.57,"wave":0.04,"lobes":2,"phase":0.37,"shear":0.01,"width":35.0,"target_length":1700.0},
+    {"id":"corpus-09","seed":2689,"aspect":1.33,"wave":0.06,"lobes":3,"phase":0.67,"shear":-0.02,"width":34.0,"target_length":1600.0},
+    {"id":"corpus-10","seed":2903,"aspect":1.44,"wave":0.03,"lobes":5,"phase":0.23,"shear":0.04,"width":36.0,"target_length":1680.0},
+    {"id":"corpus-11","seed":3181,"aspect":1.21,"wave":0.04,"lobes":4,"phase":0.53,"shear":0.02,"width":35.0,"target_length":1480.0},
+    {"id":"corpus-12","seed":3391,"aspect":1.50,"wave":0.05,"lobes":2,"phase":0.89,"shear":-0.03,"width":34.0,"target_length":1720.0},
+    {"id":"corpus-13","seed":3617,"aspect":1.38,"wave":0.03,"lobes":3,"phase":0.11,"shear":0.03,"width":36.0,"target_length":1560.0},
+    {"id":"corpus-14","seed":3821,"aspect":1.28,"wave":0.05,"lobes":5,"phase":0.43,"shear":-0.01,"width":35.0,"target_length":1640.0},
+    {"id":"corpus-15","seed":4001,"aspect":1.54,"wave":0.04,"lobes":4,"phase":0.79,"shear":0.02,"width":34.0,"target_length":1740.0},
+    {"id":"corpus-16","seed":4219,"aspect":1.16,"wave":0.03,"lobes":2,"phase":0.29,"shear":-0.04,"width":36.0,"target_length":1500.0},
+    {"id":"corpus-17","seed":4441,"aspect":1.41,"wave":0.05,"lobes":3,"phase":0.61,"shear":0.01,"width":35.0,"target_length":1660.0},
+    {"id":"corpus-18","seed":4657,"aspect":1.42,"wave":0.02,"lobes":2,"phase":0.15,"shear":0.00,"width":36.0,"target_length":1500.0},
+    {"id":"corpus-19","seed":4871,"aspect":1.48,"wave":0.03,"lobes":5,"phase":0.17,"shear":-0.02,"width":36.0,"target_length":1700.0},
+    {"id":"corpus-20","seed":5101,"aspect":1.23,"wave":0.05,"lobes":3,"phase":0.71,"shear":0.04,"width":35.0,"target_length":1540.0}
+  ]
+}

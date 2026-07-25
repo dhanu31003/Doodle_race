@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="RaceGlyph original loop and arrow emblem">
+  <defs>
+    <linearGradient id="badge" x1="24" y1="16" x2="104" y2="112" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#122638"/>
+      <stop offset="1" stop-color="#07111B"/>
+    </linearGradient>
+    <linearGradient id="track" x1="29" y1="28" x2="89" y2="99" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#79F0E0"/>
+      <stop offset="1" stop-color="#38E4D7"/>
+    </linearGradient>
+  </defs>
+  <path d="M64 5C80 5 99 14 112 29C123 42 125 62 121 80C117 98 101 115 83 121C66 127 43 123 29 112C14 101 5 82 5 64C5 45 13 26 28 15C38 8 51 5 64 5Z" fill="url(#badge)"/>
+  <path d="M26 72C20 54 30 34 48 28C65 22 85 29 95 44C104 57 102 76 91 88C79 101 58 103 44 92C34 84 34 70 43 62C51 55 63 57 68 66C73 74 70 85 62 89" fill="none" stroke="url(#track)" stroke-width="11" stroke-linecap="round"/>
+  <path d="M77 23L106 27L93 54L86 41L70 35Z" fill="#FFB14A"/>
+  <path d="M35 43C42 31 55 25 68 26" fill="none" stroke="#FFFFFF" stroke-opacity=".32" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="95" cy="87" r="6" fill="#F4FBFF"/>
+</svg>

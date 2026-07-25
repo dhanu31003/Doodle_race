@@ -1,0 +1,17 @@
+{
+  "name": "heroiclabs/nakama-godot",
+  "version": "3.4.0",
+  "tag": "v3.4.0",
+  "commit": "14b7f7078a9822c15b0424624e4c883c87730cee",
+  "source": "https://github.com/heroiclabs/nakama-godot",
+  "license": "Apache-2.0",
+  "compatibility": "Official release states Godot 4.0+; verified locally with Godot 4.7.1.",
+  "included": [
+    "addons/com.heroiclabs.nakama/Nakama.gd",
+    "addons/com.heroiclabs.nakama/api",
+    "addons/com.heroiclabs.nakama/client",
+    "addons/com.heroiclabs.nakama/socket",
+    "addons/com.heroiclabs.nakama/utils"
+  ],
+  "modifications": "Upstream source and LICENSE are byte-identical. Godot 4.7.1 generated adjacent .gd.uid resource-identity files locally; no upstream .gd source was modified."
+}

@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "asset_id": "RG-ART-005",
+  "created_at": "2026-07-23",
+  "generation_mode": "new image",
+  "provider": "OpenAI",
+  "tool": "built-in image generation",
+  "model": "provider-managed model identifier not exposed to the project",
+  "prompt": "Premium stylized top-down nighttime forest circuit born from a glowing line, with fictional open-wheel cars; composition weighted to the right with negative space on the left; deep navy, mint, cyan, coral, and gold palette; no text, logos, sponsors, real teams, drivers, circuits, or protected motorsport branding.",
+  "source": {
+    "path": "assets/generated/key_art/raceglyph_splash_concept_v1.png",
+    "sha256": "72d090cf7ae3fa171f4bf84bb7b1c05a994153e6b69ae804552ac49e0aa588ce"
+  },
+  "runtime_derivatives": [
+    {
+      "path": "assets/final/brand/raceglyph_splash.webp",
+      "sha256": "9c86c1325618a984ac5e6c64338e3505c4b63225bcbbeab8890948ec613fae3f"
+    },
+    {
+      "path": "assets/final/brand/raceglyph_boot_splash.png",
+      "sha256": "8acc4e361313e085cbc0c87820d3ced132966f623baab67cf3b79d512e43ed80"
+    }
+  ],
+  "manual_review": {
+    "integrated": true,
+    "no_visible_text_or_logo": true,
+    "no_intentional_real_world_identity": true,
+    "final_legal_clearance": false,
+    "note": "Originality, protected-mark, provider-terms, and final identity review remain an owner release gate."
+  }
+}

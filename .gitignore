@@ -1,37 +1,51 @@
-# Godot imports and local state
-.godot/
+# Godot imports, caches, and local state
+/.godot/
+/.import/
+/.mono/
+*.import
 *.tmp
 *.bak
+mono_crash.*.json
 
-# Build outputs
-builds/android/*.apk
-builds/android/*.aab
-builds/ios/*.ipa
-builds/ios/*.xcarchive/
-builds/ios/xcode/
+# Generated application and mobile build outputs
+/android/
+/builds/
+*.apk
+*.aab
+*.idsig
+*.ipa
+*.xcarchive/
+*.pck
 
 # Local backend/runtime data
-backend/.env
-backend/.env.*
-!backend/.env.example
-backend/data/
+/backend/.env
+/backend/.env.*
+!/backend/.env.example
+/backend/data/
 
-# Generated verification output
-evidence/runtime/
-evidence/logs/
-evidence/videos/
-evidence/screenshots/actual/
-evidence/screenshots/diff/
+# Generated verification output and captures
+/evidence/
+
+# Python/test caches and coverage
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
 
 # OS/editor noise
 .DS_Store
+Thumbs.db
 *.swp
 *.swo
 .idea/
 .vscode/
 
-# Secrets and signing material
+# Secrets, signing material, and local credentials
 *.keystore
 *.jks
 *.p12
+*.pfx
 *.mobileprovision
+*.pem
+*.key

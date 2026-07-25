@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "asset_id": "raceglyph-formula-car-design-reference-v1",
+  "created_at": "2026-07-24",
+  "generator": "OpenAI built-in image generation",
+  "mode": "generate-with-reference",
+  "reference_role": "The user-supplied image was used only as a high-level proportion and aerodynamic-complexity reference. No branding, livery, text, team identity, or exact protected design was requested or retained.",
+  "prompt": "Use case: stylized-concept\nAsset type: original game vehicle design reference sheet for a pseudo-3D racing game\nInput images: Image 1 is proportion and aerodynamic-complexity reference only; do not copy its livery, logos, text, team identity, or exact design\nPrimary request: create a premium original fictional modern Formula-style open-wheel race car that can guide simplified procedural/vector in-game geometry\nSubject: low tapered nose, broad layered front wing, exposed slick tires, front and rear suspension arms, sculpted sidepods with undercut, halo, compact cockpit, engine cover fin, diffuser, broad rear wing, central rain light\nStyle/medium: high-end stylized 3D game concept render with clean readable forms, realistic carbon-fiber and painted composite materials\nComposition/framing: one coherent design sheet showing a large rear three-quarter elevated chase view, a smaller front three-quarter view, and a focused cockpit/steering-wheel inset; generous separation between views\nLighting/mood: bright neutral daytime studio lighting, crisp grounded shadows, no night lighting\nColor palette: original graphite and pearl white body with vivid mint, cyan, and warm coral accent bands; black carbon fiber; no resemblance to a real team livery\nConstraints: entirely original fictional vehicle; no brands, sponsors, logos, team marks, racing-series marks, readable text, numbers, watermark, or real-world protected identity; wheels firmly touching a neutral ground plane; mechanically plausible proportions; polished AAA mobile-game quality",
+  "sha256": "615959413bd08068dd1c2167287fa5e8bfcd787abeb785a790ec94b9f1c4ab0e"
+}

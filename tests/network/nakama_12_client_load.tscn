@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/network/run_nakama_12_client_load.gd" id="1_load"]
+
+[node name="Nakama12ClientLoad" type="Node"]
+script = ExtResource("1_load")
