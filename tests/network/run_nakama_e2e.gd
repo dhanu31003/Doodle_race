@@ -1,5 +1,6 @@
 extends SceneTree
-## Requires the local backend stack. The shell wrapper owns clean startup and teardown.
+## Exercises a real Nakama endpoint. Local wrappers own disposable startup and
+## teardown; the production smoke points this same contract at HTTPS/WSS.
 
 const TestCaseType := preload("res://tests/support/test_case.gd")
 const AdapterType := preload("res://game/network/nakama/nakama_multiplayer_transport.gd")
@@ -23,15 +24,25 @@ func _run() -> void:
 	get_root().add_child(guest_root)
 	var host := AdapterType.new()
 	var guest := AdapterType.new()
-	var nakama_port := _nakama_port()
+	var endpoint := _nakama_endpoint()
 
 	var host_auth: Dictionary = await host.authenticate_device_async(
-		host_root, "raceglyph-e2e-host-device-0001", "E2E Host", "127.0.0.1", nakama_port,
-		"CHANGE_ME_LOCAL_SERVER_KEY_32_CHARS"
+		host_root,
+		"raceglyph-e2e-host-device-0001",
+		"E2E Host",
+		str(endpoint["host"]),
+		int(endpoint["port"]),
+		str(endpoint["server_key"]),
+		str(endpoint["scheme"])
 	)
 	var guest_auth: Dictionary = await guest.authenticate_device_async(
-		guest_root, "raceglyph-e2e-guest-device-0002", "E2E Guest", "127.0.0.1", nakama_port,
-		"CHANGE_ME_LOCAL_SERVER_KEY_32_CHARS"
+		guest_root,
+		"raceglyph-e2e-guest-device-0002",
+		"E2E Guest",
+		str(endpoint["host"]),
+		int(endpoint["port"]),
+		str(endpoint["server_key"]),
+		str(endpoint["scheme"])
 	)
 	_test.assert_true(host_auth["ok"], "official SDK must device-authenticate host")
 	_test.assert_true(guest_auth["ok"], "official SDK must device-authenticate guest")
@@ -176,8 +187,12 @@ func _run() -> void:
 		start_tick
 	)
 	_test.assert_true((await guest.send_envelope(room_code, input))["ok"], "guest input send through official socket")
-	var relayed_input: Dictionary = await host.wait_for_opcode_async(ProtocolType.OP_INPUT_FRAME)
-	_test.assert_true(relayed_input["ok"], "authoritative match relays bounded guest input to host")
+	await create_timer(0.25).timeout
+	var cloud_snapshot: Dictionary = await guest.wait_for_opcode_async(ProtocolType.OP_STATE_SNAPSHOT)
+	_test.assert_true(cloud_snapshot["ok"], "cloud authority publishes a race snapshot after mobile input")
+	if cloud_snapshot["ok"]:
+		_test.assert_equal(str(cloud_snapshot["value"].get("sender_id", "")), "server", "Nakama owns snapshot authority")
+		_test.assert_equal(cloud_snapshot["value"]["payload"].get("cars", []).size(), 2, "cloud snapshot preserves the full grid")
 	var future_input := input.duplicate(true)
 	future_input["seq"] = 2
 	future_input["tick"] = start_tick + 100_000
@@ -188,7 +203,7 @@ func _run() -> void:
 	var future_input_error: Dictionary = await _wait_for_error_code(guest, "input_tick_future")
 	_test.assert_true(future_input_error["ok"], "backend rejects input too far ahead of authority")
 
-	var snapshot := ProtocolType.make_envelope(
+	var forbidden_snapshot := ProtocolType.make_envelope(
 		ProtocolType.OP_STATE_SNAPSHOT,
 		host.session_user_id(),
 		1,
@@ -196,27 +211,12 @@ func _run() -> void:
 		{"cars": [_car_state(0, 1000), _car_state(1, 900)]},
 		start_tick
 	)
-	_test.assert_true((await host.send_envelope(room_code, snapshot))["ok"], "host authoritative snapshot send")
-	var relayed_snapshot: Dictionary = await guest.wait_for_opcode_async(ProtocolType.OP_STATE_SNAPSHOT)
-	_test.assert_true(relayed_snapshot["ok"], "authoritative match relays host snapshot to guest")
-	if relayed_snapshot["ok"]:
-		var relayed_car: Dictionary = relayed_snapshot["value"]["payload"]["cars"][0]
-		_test.assert_equal(relayed_car["gear"], 5, "real Nakama relay preserves Formula gear authority")
-		_test.assert_equal(relayed_car["engine_rpm_q"], 108_500, "real Nakama relay preserves fixed-point engine RPM")
-		_test.assert_equal(relayed_car["steering_q"], -4200, "real Nakama relay preserves physical steering state")
-		_test.assert_equal(relayed_car["slip_angle_q"], 910, "real Nakama relay preserves tyre-slip telemetry")
-		_test.assert_equal(relayed_car["contact_serial"], 3, "real Nakama relay preserves the car-contact event serial")
-		_test.assert_equal(relayed_car["contact_speed_q"], 72_500, "real Nakama relay preserves fixed-point impact speed")
-		_test.assert_equal(relayed_car["contact_normal_y_q"], 8000, "real Nakama relay preserves the impact normal as part of one bundle")
-	var future_snapshot := snapshot.duplicate(true)
-	future_snapshot["seq"] = 2
-	future_snapshot["tick"] = start_tick + 100_000
 	_test.assert_true(
-		(await host.send_envelope(room_code, future_snapshot))["ok"],
-		"structurally valid future snapshot reaches backend validation"
+		(await host.send_envelope(room_code, forbidden_snapshot))["ok"],
+		"client snapshot reaches the server authority boundary"
 	)
-	var future_snapshot_error: Dictionary = await _wait_for_error_code(host, "snapshot_tick_future")
-	_test.assert_true(future_snapshot_error["ok"], "backend rejects snapshot too far ahead of authority")
+	var forbidden_snapshot_error: Dictionary = await _wait_for_error_code(host, "server_authority_only")
+	_test.assert_true(forbidden_snapshot_error["ok"], "backend rejects snapshots from every phone, including the room creator")
 
 	# Route the second forced loss through the production callback -> persistent
 	# session -> NetworkRaceScreen path. This is deliberately not a direct
@@ -280,31 +280,10 @@ func _run() -> void:
 	_test.assert_equal(str(network_session.connection_state), str(SessionType.CONNECTION_ONLINE), "production session returns online after resume")
 	_test.assert_false(race_screen.runtime.suspended, "authoritative resume snapshot releases NetworkRaceScreen suspension")
 	_test.assert_false(connection_panel.visible, "reconnect panel closes after the production session resumes")
-	var complete := ProtocolType.make_envelope(
-		ProtocolType.OP_RACE_EVENT, host.session_user_id(), 1, host.room_epoch(),
-		{"type": "race_complete", "results": [
-			{"player_id": host.session_user_id(), "slot": 0, "position": 1, "status": "finished", "laps": 5, "finish_time_ms": 90000, "dnf_reason": ""},
-			{"player_id": guest.session_user_id(), "slot": 1, "position": 2, "status": "finished", "laps": 5, "finish_time_ms": 91000, "dnf_reason": ""},
-		]}, start_tick + 120
-	)
-	_test.assert_true((await host.send_envelope(room_code, complete))["ok"], "host publishes authoritative results for real rematch flow")
-	var host_results := await _wait_for_race_event_type(host, "race_complete")
-	_test.assert_true(host_results["ok"], "real authority accepts and broadcasts host classification")
-	var session_results := await _wait_for_session_state(network_session, "RESULTS")
-	_test.assert_true(session_results["ok"], "persistent guest session reaches authoritative RESULTS")
-	await process_frame
-	var terminal_panel: PanelContainer = race_screen.get("_terminal_panel")
-	_test.assert_true(terminal_panel != null and terminal_panel.visible, "NetworkRaceScreen exposes rematch/share results controls")
-	_test.assert_true((await network_session.request_rematch_async())["ok"], "guest submits bounded rematch request through production session")
-	var requested := await _wait_for_race_event_type(host, "rematch_requested")
-	_test.assert_true(requested["ok"], "real authority relays guest rematch intent to host")
-	_test.assert_true((await host.request_rematch(room_code))["ok"], "host rematch restart reaches real authority")
-	var session_ready := await _wait_for_session_state(network_session, "READY")
-	_test.assert_true(session_ready["ok"], "real rematch returns persistent session to READY")
-	if session_ready["ok"]:
-		_test.assert_true(bool(session_ready["value"].get("join_locked", false)), "real rematch preserves explicit grid lock")
-		for member in session_ready["value"].get("members", []):
-			_test.assert_false(bool(member.get("ready", false)), "real rematch resets ready acknowledgement")
+	var live_room: Dictionary = guest.room_snapshot(room_code)
+	_test.assert_true(live_room["ok"], "reconnected phone retains the live cloud room")
+	if live_room["ok"]:
+		_test.assert_equal(str(live_room["value"].get("state", "")), "RACING", "cloud race remains authoritative after phone reconnect")
 	race_screen.queue_free()
 	await process_frame
 	race_screen = null
@@ -313,13 +292,20 @@ func _run() -> void:
 	track_fixture.clear()
 	await process_frame
 
+	guest.drain_events()
+	var authority_tick_before_creator_leave := guest.last_server_tick()
+	_test.assert_true((await host.leave_room(room_code))["ok"], "room creator can leave the live cloud race")
+	var creator_departure := await _wait_for_transport_room_count(guest, room_code, 1)
+	_test.assert_true(creator_departure["ok"], "remaining phone observes creator departure")
+	if creator_departure["ok"]:
+		_test.assert_equal(str(creator_departure["value"].get("state", "")), "RACING", "creator departure does not stop cloud physics")
+		_test.assert_equal(str(creator_departure["value"].get("host_id", "")), guest.session_user_id(), "lobby administration transfers to the remaining phone")
+	var continued_snapshot: Dictionary = await _wait_for_server_tick_after(guest, authority_tick_before_creator_leave)
+	_test.assert_true(continued_snapshot["ok"], "remaining phone keeps receiving cloud snapshots")
+	if continued_snapshot["ok"]:
+		_test.assert_true(int(continued_snapshot["value"].get("tick", 0)) > authority_tick_before_creator_leave, "cloud authority advances after creator departure")
 	var left: Dictionary = await guest.leave_room(room_code)
-	_test.assert_true(left["ok"], "voluntary leave is acknowledged through authoritative RPC")
-	var departed: Dictionary = await _wait_for_race_event_type(host, "peer_departed")
-	_test.assert_true(departed["ok"], "remaining peer observes permanent departure")
-	var host_alone: Dictionary = await _wait_for_room_count(host, 1)
-	_test.assert_true(host_alone["ok"], "voluntary departure immediately releases the room slot")
-	_test.assert_true((await host.leave_room(room_code))["ok"], "host can close the completed E2E room cleanly")
+	_test.assert_true(left["ok"], "last phone can leave the cloud room cleanly")
 
 	var kick_created: Dictionary = await host.create_private_room("Kick Host")
 	_test.assert_true(kick_created["ok"], "real kick fixture creates a fresh private room")
@@ -362,6 +348,26 @@ func _wait_for_room_count(transport: RefCounted, count: int) -> Dictionary:
 		if event["ok"] and int(event["value"]["payload"].get("member_count", -1)) == count:
 			return event
 	return {"ok": false, "error": {"code": "room_count_timeout"}}
+
+
+func _wait_for_transport_room_count(transport: RefCounted, room_code: String, count: int) -> Dictionary:
+	var deadline := Time.get_ticks_msec() + 4000
+	while Time.get_ticks_msec() <= deadline:
+		var snapshot: Dictionary = transport.room_snapshot(room_code)
+		if snapshot["ok"] and int(snapshot["value"].get("member_count", -1)) == count:
+			return snapshot
+		await process_frame
+	return {"ok": false, "error": {"code": "room_count_timeout", "expected": count}}
+
+
+func _wait_for_server_tick_after(transport: RefCounted, minimum_tick: int) -> Dictionary:
+	var deadline := Time.get_ticks_msec() + 4000
+	while Time.get_ticks_msec() <= deadline:
+		var server_tick := int(transport.last_server_tick())
+		if server_tick > minimum_tick:
+			return {"ok": true, "value": {"tick": server_tick}}
+		await process_frame
+	return {"ok": false, "error": {"code": "snapshot_timeout", "minimum_tick": minimum_tick}}
 
 
 func _wait_for_session_state(session: PrivateMultiplayerSession, state: String) -> Dictionary:
@@ -498,13 +504,26 @@ func _finish(host: RefCounted, guest: RefCounted, host_root: Node, guest_root: N
 	call_deferred("_quit_after_cleanup", exit_code)
 
 
-func _nakama_port() -> int:
-	var raw := OS.get_environment("RACEGLYPH_TEST_NAKAMA_PORT").strip_edges()
-	if raw.is_valid_int():
-		var port := int(raw)
-		if port >= 1024 and port <= 65535:
-			return port
-	return 7350
+func _nakama_endpoint() -> Dictionary:
+	var host := OS.get_environment("RACEGLYPH_TEST_NAKAMA_HOST").strip_edges()
+	if host.is_empty():
+		host = "127.0.0.1"
+	var port := 7350
+	var raw_port := OS.get_environment("RACEGLYPH_TEST_NAKAMA_PORT").strip_edges()
+	if raw_port.is_valid_int() and int(raw_port) >= 1 and int(raw_port) <= 65535:
+		port = int(raw_port)
+	var scheme := OS.get_environment("RACEGLYPH_TEST_NAKAMA_SCHEME").strip_edges().to_lower()
+	if scheme not in ["http", "https"]:
+		scheme = "http"
+	var server_key := OS.get_environment("RACEGLYPH_TEST_NAKAMA_KEY").strip_edges()
+	if server_key.is_empty():
+		server_key = "CHANGE_ME_LOCAL_SERVER_KEY_32_CHARS"
+	return {
+		"host": host,
+		"port": port,
+		"scheme": scheme,
+		"server_key": server_key,
+	}
 
 
 func _quit_after_cleanup(exit_code: int) -> void:

@@ -1,0 +1,25 @@
+{
+	email {$ACME_EMAIL}
+	admin off
+}
+
+{$RACEGLYPH_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	# Caddy preserves WebSocket upgrades automatically, so Nakama HTTP and WSS
+	# share the same mobile endpoint. Access logging is intentionally disabled:
+	# Nakama WebSocket authentication can place session material in the request
+	# URI and that must never enter reverse-proxy logs.
+	reverse_proxy nakama:7350 {
+		health_uri /healthcheck
+		health_interval 15s
+		health_timeout 3s
+	}
+}

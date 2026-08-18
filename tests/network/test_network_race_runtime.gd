@@ -33,12 +33,27 @@ func run() -> Dictionary:
 	test.assert_true(NetworkRaceScreenType.history_persistence_failure_text({"ok": false, "message": "Disk is read-only"}).begins_with("LOCAL HISTORY NOT SAVED"), "results persistence failure is explicit in terminal UI")
 	test.assert_equal(NetworkRaceScreenType.history_persistence_failure_text({"ok": true}), "", "successful results persistence emits no false warning")
 	_test_formula_dynamics_snapshot_round_trip(test)
+	_test_cloud_authority_path_elevation(test)
 	_test_contact_event_survives_guest_paths(test)
 	_test_two_client_authority_prediction_and_leave(test)
 	_test_bridge_snapshot_reconciliation(test)
 	_test_recovery_parity_forces_two_hard_snaps(test)
 	_test_deterministic_loss_jitter_and_reordering(test)
 	return test.result("network_race_runtime")
+
+
+func _test_cloud_authority_path_elevation(test: RefCounted) -> void:
+	var item := CatalogType.by_id("builtin-nightfall-crossing")
+	var compiled: TrackCompileResult = CompilerType.compile(item["definition"])
+	var manifest := ManifestType.build(item["definition"], compiled.track)
+	var authority_path: Dictionary = manifest.get("authority_path", {})
+	var elevations: Array = authority_path.get("elevation_q", [])
+	test.assert_equal(elevations.size(), authority_path.get("centerline_q", []).size(), "cloud authority path pairs every route sample with elevation")
+	test.assert_true(not elevations.is_empty() and elevations.max() == ManifestType.AUTHORITY_PATH_SCALE, "cloud authority path preserves the bridge deck height")
+	test.assert_true(ManifestType.validate(manifest)["ok"], "cloud authority accepts its hashed bridge elevation profile")
+	var tampered := manifest.duplicate(true)
+	tampered["authority_path"]["elevation_q"][0] = ManifestType.AUTHORITY_PATH_SCALE
+	test.assert_false(ManifestType.validate(tampered)["ok"], "cloud authority rejects an elevation profile changed after hashing")
 
 
 func _test_formula_dynamics_snapshot_round_trip(test: RefCounted) -> void:
@@ -300,6 +315,9 @@ func _test_recovery_parity_forces_two_hard_snaps(test: RefCounted) -> void:
 
 
 func _test_deterministic_loss_jitter_and_reordering(test: RefCounted) -> void:
+	if LimitsType.PROTOCOL_VERSION >= 4:
+		_test_cloud_prediction_under_latency(test)
+		return
 	# This is a bounded deterministic process test, not a claim about real WAN,
 	# radio, or physical-device behavior. It injects exact 10% packet loss and
 	# 0–100 ms scheduling jitter into the same runtime/authority surfaces.
@@ -509,6 +527,9 @@ func _run_impaired_frame(
 
 
 func _test_two_client_authority_prediction_and_leave(test: RefCounted) -> void:
+	if LimitsType.PROTOCOL_VERSION >= 4:
+		_test_cloud_authority_and_creator_departure(test)
+		return
 	var server := ServerType.new()
 	var host_transport := TransportType.new(server, "race-host")
 	var guest_transport := TransportType.new(server, "race-guest")
@@ -682,3 +703,153 @@ func _test_two_client_authority_prediction_and_leave(test: RefCounted) -> void:
 	))
 	test.assert_true(terminal_runtime.finished, "host-loss event enters terminal UI state")
 	test.assert_equal(terminal_runtime.terminal_reason, "simulation_host_departed", "host-loss terminal reason stays honest")
+
+
+func _test_cloud_prediction_under_latency(test: RefCounted) -> void:
+	var item := CatalogType.all()[0]
+	var compiled: TrackCompileResult = CompilerType.compile(item["definition"])
+	var roster := [
+		{"player_id": "cloud-creator", "display_name": "Creator", "slot": 0},
+		{"player_id": "cloud-driver", "display_name": "Driver", "slot": 1},
+	]
+	var runtime := RuntimeType.new()
+	test.assert_true(runtime.configure(
+		compiled.track, roster, "cloud-driver", "cloud-creator", "CLOUD1", 1, 180
+	)["ok"], "cloud prediction runtime configures")
+	var outbound: Array[Dictionary] = []
+	runtime.outbound_envelope.connect(func(envelope: Dictionary) -> void:
+		outbound.append(envelope.duplicate(true))
+	)
+	test.assert_true(runtime.begin(180), "cloud prediction begins on the server tick")
+	var start_position := runtime.local_entry.state.position
+	var delayed: Array[Dictionary] = []
+	var generated_snapshots := 0
+	var dropped_snapshots := 0
+	var accepted_snapshots := 0
+	var maximum_jitter_frames := 0
+	for frame in 360:
+		runtime.advance_frame(1.0 / 60.0, RaceInputType.new(0.08, 1.0, 0.0, false))
+		if frame == 0:
+			test.assert_true(
+				runtime.local_entry.state.position.distance_to(start_position) > 0.0,
+				"touch input moves the predicted car on the first local frame without a network round trip"
+			)
+		if frame % 3 == 0:
+			generated_snapshots += 1
+			if generated_snapshots % 10 == 0:
+				dropped_snapshots += 1
+			else:
+				var jitter_frames := (generated_snapshots * 5) % 7
+				maximum_jitter_frames = maxi(maximum_jitter_frames, jitter_frames)
+				var local_car := CodecType.car_from_entry(runtime.local_entry, 1)
+				var remote_car := CodecType.car_from_entry(runtime.director.entry(&"cloud-creator"), 0)
+				delayed.append({
+					"due": frame + jitter_frames,
+					"event": ProtocolType.make_envelope(
+						ProtocolType.OP_STATE_SNAPSHOT, "server", generated_snapshots, 1,
+						{"cars": [remote_car, local_car], "authority": "cloud"},
+						180 + frame + 1
+					),
+				})
+		var pending: Array[Dictionary] = []
+		for packet in delayed:
+			if int(packet["due"]) <= frame:
+				if runtime.handle_event(packet["event"])["ok"]:
+					accepted_snapshots += 1
+			else:
+				pending.append(packet)
+		delayed = pending
+	for packet in delayed:
+		if runtime.handle_event(packet["event"])["ok"]:
+			accepted_snapshots += 1
+	var input_count := 0
+	var snapshot_count := 0
+	for envelope in outbound:
+		if int(envelope.get("opcode", -1)) == ProtocolType.OP_INPUT_FRAME:
+			input_count += 1
+		elif int(envelope.get("opcode", -1)) == ProtocolType.OP_STATE_SNAPSHOT:
+			snapshot_count += 1
+	test.assert_true(input_count >= 118 and input_count <= 121, "mobile prediction submits at the bounded 20 Hz cadence")
+	test.assert_equal(snapshot_count, 0, "no phone publishes authoritative snapshots")
+	test.assert_equal(dropped_snapshots, generated_snapshots / 10, "latency fixture drops exactly ten percent of cloud snapshots")
+	test.assert_true(maximum_jitter_frames == 6, "latency fixture reaches the full simulated 100 ms jitter budget")
+	test.assert_true(accepted_snapshots >= 80, "prediction accepts enough cloud corrections through loss and jitter")
+	test.assert_true(runtime.local_entry.state.is_finite(), "predicted mobile state remains finite under loss and jitter")
+	test.assert_true(runtime.local_entry.state.speed() > 40.0, "local controls remain responsive while cloud snapshots are delayed")
+	test.assert_true(runtime.latest_authoritative_tick > 180, "cloud authority ticks continue advancing")
+
+
+func _test_cloud_authority_and_creator_departure(test: RefCounted) -> void:
+	var server := ServerType.new()
+	var creator := TransportType.new(server, "cloud-room-creator")
+	var driver := TransportType.new(server, "cloud-room-driver")
+	var created: Dictionary = creator.create_private_room("Creator")
+	test.assert_true(created["ok"], "cloud room creator can create a mobile room")
+	if not created["ok"]:
+		return
+	var code := str(created["value"]["room_code"])
+	test.assert_true(driver.join_private_room(code, "Driver")["ok"], "second phone joins the cloud room")
+	var item := CatalogType.all()[0]
+	var compiled: TrackCompileResult = CompilerType.compile(item["definition"])
+	var manifest := ManifestType.build(item["definition"], compiled.track)
+	creator.submit_track_manifest(code, manifest)
+	var report := {
+		"success": true,
+		"source_hash": manifest["source_hash"],
+		"generator_version": manifest["generator_version"],
+		"compiled_fingerprint": manifest["compiled_fingerprint"],
+	}
+	creator.submit_generation_report(code, report)
+	driver.submit_generation_report(code, report)
+	creator.set_ready(code, true)
+	driver.set_ready(code, true)
+	creator.set_room_lock(code, true)
+	var countdown: Dictionary = creator.start_countdown(code)
+	test.assert_true(countdown["ok"], "creator may start the cloud-owned race")
+	test.assert_equal(str(countdown["value"]["countdown"].get("authority", "")), "cloud", "countdown declares cloud authority")
+	server.advance_time(LimitsType.COUNTDOWN_SECONDS * 1000)
+	var epoch := int(creator.room_snapshot(code)["value"]["room_epoch"])
+	var forbidden_snapshot := ProtocolType.make_envelope(
+		ProtocolType.OP_STATE_SNAPSHOT, "cloud-room-creator", 1, epoch,
+		{"cars": [_cloud_test_car(0, 0, 0), _cloud_test_car(1, 0, 1000)]}, server.current_tick()
+	)
+	var snapshot_result: Dictionary = creator.send_envelope(code, forbidden_snapshot)
+	test.assert_false(snapshot_result["ok"], "room creator cannot publish vehicle authority")
+	test.assert_equal(str(snapshot_result["error"]["code"]), "server_authority_only", "snapshot refusal identifies the cloud boundary")
+	var forbidden_results := ProtocolType.make_envelope(
+		ProtocolType.OP_RACE_EVENT, "cloud-room-creator", 1, epoch,
+		{"type": "race_complete", "results": [
+			{"player_id": "cloud-room-creator", "slot": 0, "position": 1, "status": "finished", "laps": 3, "finish_time_ms": 90_000, "dnf_reason": ""},
+			{"player_id": "cloud-room-driver", "slot": 1, "position": 2, "status": "finished", "laps": 3, "finish_time_ms": 91_000, "dnf_reason": ""},
+		]}, server.current_tick()
+	)
+	var results_result: Dictionary = creator.send_envelope(code, forbidden_results)
+	test.assert_false(results_result["ok"], "room creator cannot publish race results")
+	test.assert_equal(str(results_result["error"]["code"]), "server_authority_only", "result refusal identifies the cloud boundary")
+	var creator_leave: Dictionary = creator.leave_room(code)
+	test.assert_true(creator_leave["ok"], "creator phone may leave while cloud authority continues")
+	var continued: Dictionary = driver.room_snapshot(code)
+	test.assert_true(continued["ok"], "remaining phone retains the cloud room")
+	test.assert_equal(str(continued["value"]["state"]), str(LimitsType.ROOM_RACING), "creator departure does not terminate cloud physics")
+	test.assert_equal(str(continued["value"]["host_id"]), "cloud-room-driver", "lobby administration transfers to a connected phone")
+	var saw_terminal := false
+	for event in driver.drain_events():
+		if int(event.get("opcode", -1)) == ProtocolType.OP_ROOM_ENDED:
+			saw_terminal = true
+	test.assert_false(saw_terminal, "creator departure emits no simulation-host terminal event")
+
+
+func _cloud_test_car(slot: int, x_q: int, y_q: int) -> Dictionary:
+	return {
+		"slot": slot,
+		"x_q": x_q,
+		"y_q": y_q,
+		"rotation_q": 0,
+		"velocity_x_q": 0,
+		"velocity_y_q": 0,
+		"lap": 0,
+		"checkpoint": 0,
+		"collision_layer": 1,
+		"collision_mask": 1,
+		"flags": 0,
+	}

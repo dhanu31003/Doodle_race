@@ -4,10 +4,10 @@ Status: **implemented deterministic Formula-style model**. This model targets cr
 
 ## Authority contract
 
-- Simulation runs at a fixed 60 Hz. Human, AI, replay, host authority, and guest prediction execute the same `ArcadeVehicleModel` and bounded `VehicleConfig`.
+- Simulation runs at a fixed 60 Hz. Offline human/AI/replay use `ArcadeVehicleModel`; online rooms use the protocol-4 bounded cloud model while every phone predicts its own car immediately and reconciles to server snapshots.
 - The only player commands remain steering, accelerator, and brake/reverse. Automatic shifting does not add a new network input.
 - Position, velocity, heading, physical rack position, gear, engine RPM, shift ticks, slip angle, driven-wheel slip, and lateral acceleration are quantized before an authority snapshot.
-- Protocol 3 / app build 0.3.0 is the live compatibility boundary. Older peers are rejected before room admission because their predictor lacks the released surface and airborne-force rules.
+- Protocol 4 / app build 0.4.0 is the live compatibility boundary. Older peers are rejected before room admission because they use client-host authority and lack the cloud simulation contract.
 
 ## Eight-speed drivetrain
 

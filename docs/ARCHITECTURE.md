@@ -64,7 +64,7 @@ Dependencies point inward. Domain code must not read the scene tree, renderer, c
 - Bridge layer is part of vehicle/progress state and collision filtering.
 - AI produces the same input command type as human controls.
 
-Offline uses the local simulation directly. Multiplayer v1 uses a casual client host as simulation authority; guests predict their local car and interpolate remote snapshots. The host validates inputs and race rules. Backend unavailability never disables offline services.
+Offline uses the local simulation directly. Protocol-4 multiplayer uses the Nakama match runtime as 60 Hz simulation authority. Every phone sends bounded inputs, predicts its own car immediately, interpolates remote snapshots, and reconciles to cloud state. The room creator controls lobby policy but never publishes race snapshots or results. Backend unavailability never disables offline services.
 
 The inventoried `icon_boost.svg` and `boost.wav` resources are dormant legacy/internal compatibility assets. No shipped control, AI command, or network message can activate boost, and no player-facing screen exposes either resource. Their eventual package inclusion/exclusion remains an asset-ledger decision, not a gameplay feature.
 

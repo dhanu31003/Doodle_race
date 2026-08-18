@@ -13,6 +13,7 @@ func run() -> Dictionary:
 	_test_envelope_validation(test)
 	_test_malformed_peer_quarantine(test)
 	_test_remote_endpoints_cannot_downgrade_tls(test)
+	_test_mobile_defaults_use_public_tls(test)
 	return test.result("network_protocol_validation")
 
 
@@ -233,6 +234,16 @@ func _test_remote_endpoints_cannot_downgrade_tls(test: RefCounted) -> void:
 	var fallback := EndpointType.sanitize({"host": "bad host", "scheme": "http"})
 	test.assert_equal(fallback["host"], EndpointType.defaults()["host"], "invalid host falls back to local default")
 	test.assert_equal(fallback["scheme"], "http", "validated local fallback remains usable for development")
+
+
+func _test_mobile_defaults_use_public_tls(test: RefCounted) -> void:
+	var public_endpoint := EndpointType.public_defaults()
+	test.assert_equal(public_endpoint["host"], "multiplayer.neutale.com", "mobile service uses the owned production hostname")
+	test.assert_equal(public_endpoint["port"], 443, "mobile service uses the standard TLS port")
+	test.assert_equal(public_endpoint["scheme"], "https", "mobile service cannot ship over cleartext")
+	test.assert_equal(public_endpoint["server_key"], EndpointType.PUBLIC_SERVER_KEY, "mobile client and Nakama share the public application key")
+	var android_development := EndpointType.development_defaults_for_platform("Android")
+	test.assert_equal(android_development["host"], "10.0.2.2", "Android engineering override still reaches the emulator host")
 
 
 func _car_state(slot: int) -> Dictionary:

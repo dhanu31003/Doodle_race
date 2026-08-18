@@ -28,15 +28,11 @@ func _test_results_rematch_authority(test: RefCounted) -> void:
 	var host: RefCounted = fixture["host"]
 	var guest: RefCounted = fixture["guest"]
 	var code := str(fixture["code"])
-	var epoch := int(fixture["epoch"])
-	var complete := ProtocolType.make_envelope(
-		ProtocolType.OP_RACE_EVENT, "rematch-host", 1, epoch,
-		{"type": "race_complete", "results": [
+	var results := [
 			{"player_id": "rematch-host", "slot": 0, "position": 1, "status": "finished", "laps": 3, "finish_time_ms": 90000, "dnf_reason": ""},
 			{"player_id": "rematch-guest", "slot": 1, "position": 2, "status": "finished", "laps": 3, "finish_time_ms": 91000, "dnf_reason": ""},
-		]}, fixture["server"].current_tick()
-	)
-	test.assert_true(host.send_envelope(code, complete)["ok"], "host publishes authoritative results before rematch")
+	]
+	test.assert_true(fixture["server"].complete_cloud_race_for_test(code, results)["ok"], "cloud publishes authoritative results before rematch")
 	var guest_request: Dictionary = guest.request_rematch(code)
 	test.assert_true(guest_request["ok"] and not bool(guest_request["value"]["host_restart"]), "guest rematch is a request rather than unauthorized restart")
 	var host_notified := false
@@ -255,7 +251,7 @@ func _test_twelve_player_happy_path(test: RefCounted) -> void:
 		server.current_tick()
 	)
 	test.assert_true(clients[1].send_envelope(room_code, guest_input)["ok"], "guest input must reach authority")
-	test.assert_true(_events_have_opcode(clients[0].drain_events(), ProtocolType.OP_INPUT_FRAME), "host must receive guest input frame")
+	test.assert_false(_events_have_opcode(clients[0].drain_events(), ProtocolType.OP_INPUT_FRAME), "peer input is consumed by cloud authority, not another phone")
 
 	var snapshot_cars: Array = []
 	for slot in LimitsType.MAX_PLAYERS:
@@ -268,15 +264,16 @@ func _test_twelve_player_happy_path(test: RefCounted) -> void:
 		{"cars": snapshot_cars},
 		server.current_tick()
 	)
-	test.assert_true(clients[0].send_envelope(room_code, host_snapshot)["ok"], "host snapshot must be accepted")
+	var host_snapshot_result: Dictionary = clients[0].send_envelope(room_code, host_snapshot)
+	test.assert_false(host_snapshot_result["ok"], "room creator snapshot must be refused")
+	test.assert_equal(_error_code(host_snapshot_result), "server_authority_only", "cloud snapshot boundary code")
 	var snapshot_events: Array = clients[1].drain_events()
-	test.assert_true(_events_have_opcode(snapshot_events, ProtocolType.OP_STATE_SNAPSHOT), "guest must receive authoritative snapshot")
-	test.assert_true(_events_preserve_formula_dynamics(snapshot_events), "fake authority relay preserves Formula drivetrain and tyre telemetry")
+	test.assert_false(_events_have_opcode(snapshot_events, ProtocolType.OP_STATE_SNAPSHOT), "fake lifecycle server never accepts phone snapshots")
 
 	var departed: Dictionary = clients[0].leave_room(room_code)
 	test.assert_true(departed["ok"], "host departure must be handled")
-	test.assert_equal(departed["value"]["state"], str(LimitsType.ROOM_CLOSED), "in-race host departure must close v1 room")
-	test.assert_equal(departed["value"]["close_reason"], "simulation_host_departed", "host-loss reason must be explicit")
+	test.assert_equal(departed["value"]["state"], str(LimitsType.ROOM_RACING), "cloud race continues after creator departure")
+	test.assert_equal(departed["value"]["host_id"], "player-02", "lobby administration transfers during cloud race")
 
 
 func _test_track_mismatch_and_ready_gate(test: RefCounted) -> void:
@@ -411,28 +408,17 @@ func _test_wire_rate_limits(test: RefCounted) -> void:
 	host = snapshot_fixture["host"]
 	code = snapshot_fixture["code"]
 	epoch = snapshot_fixture["epoch"]
-	for sequence in range(1, LimitsType.MAX_SNAPSHOTS_PER_SECOND + 1):
-		var snapshot := ProtocolType.make_envelope(
-			ProtocolType.OP_STATE_SNAPSHOT,
-			"snapshot-host",
-			sequence,
-			epoch,
-			{"cars": [_car_state(0, sequence * 10, 0), _car_state(1, 0, sequence * 10)]},
-			server.current_tick()
-		)
-		test.assert_true(host.send_envelope(code, snapshot)["ok"], "snapshot %d inside 15 Hz cap" % sequence)
-		server.advance_time(50)
-	var overflow_snapshot := ProtocolType.make_envelope(
+	var forbidden_snapshot := ProtocolType.make_envelope(
 		ProtocolType.OP_STATE_SNAPSHOT,
 		"snapshot-host",
-		LimitsType.MAX_SNAPSHOTS_PER_SECOND + 1,
+		1,
 		epoch,
 		{"cars": [_car_state(0, 999, 0)]},
 		server.current_tick()
 	)
-	var snapshot_limit: Dictionary = host.send_envelope(code, overflow_snapshot)
-	test.assert_false(snapshot_limit["ok"], "sixteenth snapshot inside one second must be rate-limited")
-	test.assert_equal(_error_code(snapshot_limit), "snapshot_rate_limited", "snapshot rate-limit code")
+	var snapshot_limit: Dictionary = host.send_envelope(code, forbidden_snapshot)
+	test.assert_false(snapshot_limit["ok"], "every phone snapshot must be refused")
+	test.assert_equal(_error_code(snapshot_limit), "server_authority_only", "cloud-only snapshot code")
 
 	server = FakeServerType.new()
 	var control_host := TransportType.new(server, "control-host")

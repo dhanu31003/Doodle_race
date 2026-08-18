@@ -1,5 +1,5 @@
 extends Node
-## Real local-only 12-client Nakama admission/start/relay smoke.
+## Real local-only 12-client Nakama cloud-authority/load smoke.
 ## The shell runner owns an isolated disposable Compose stack.
 
 const TestCaseType := preload("res://tests/support/test_case.gd")
@@ -27,7 +27,7 @@ var _started_at_ms := 0
 var _authentication_count := 0
 var _admission_count := 0
 var _overflow_refusal_count := 0
-var _input_relay_count := 0
+var _input_submission_count := 0
 var _snapshot_delivery_count := 0
 
 
@@ -163,12 +163,19 @@ func _run() -> void:
 	if race_tick < 0:
 		await _finish()
 		return
+	# Discard countdown-era snapshots so measured deliveries are definitely
+	# produced after the input burst below.
+	for client_index in range(CLIENT_COUNT):
+		for event in _clients[client_index].drain_events():
+			_test.assert_false(
+				int(event.get("opcode", -1)) == OP_ERROR,
+				"client %d must enter cloud simulation without an authority error" % client_index
+			)
 
-	var input_senders: Dictionary = {}
 	for client_index in range(1, CLIENT_COUNT):
 		var guest: RefCounted = _clients[client_index]
-		input_senders[guest.session_user_id()] = 0
 		for sequence in range(INPUTS_PER_GUEST):
+			var input_tick := maxi(race_tick, guest.last_server_tick())
 			var input := _make_envelope(
 				OP_INPUT_FRAME,
 				guest.session_user_id(),
@@ -179,63 +186,53 @@ func _run() -> void:
 					"throttle": 700 + sequence * 50,
 					"brake": 0,
 					"boost": false,
-					"ack_host_tick": race_tick,
+					"ack_host_tick": input_tick,
 				},
-				race_tick
+				input_tick
 			)
 			var queued: Dictionary = await guest.send_envelope(room_code, input)
 			_test.assert_true(queued["ok"], "guest %d input %d must queue" % [client_index, sequence])
+			if queued["ok"]:
+				_input_submission_count += 1
 
 	var expected_inputs := (CLIENT_COUNT - 1) * INPUTS_PER_GUEST
-	for relay_index in range(expected_inputs):
-		var relayed: Dictionary = await host.wait_for_opcode_async(OP_INPUT_FRAME, 6000)
-		_test.assert_true(relayed["ok"], "host must receive relayed guest input %d" % relay_index)
-		if not relayed["ok"]:
-			break
-		_input_relay_count += 1
-		var sender_id := str(relayed["value"].get("sender_id", ""))
-		if input_senders.has(sender_id):
-			input_senders[sender_id] = int(input_senders[sender_id]) + 1
-		_test.assert_false(bool(relayed["value"]["payload"].get("boost", true)), "relayed inputs must keep boost disabled")
-	_test.assert_equal(_input_relay_count, expected_inputs, "host must receive every bounded guest input")
-	for sender_id in input_senders:
-		_test.assert_equal(
-			int(input_senders[sender_id]), INPUTS_PER_GUEST,
-			"each admitted guest must contribute the same relay load"
-		)
+	_test.assert_equal(_input_submission_count, expected_inputs, "all bounded mobile inputs must reach cloud authority")
+	await get_tree().create_timer(0.10).timeout
+	# Measure only snapshots emitted after Nakama has consumed the complete input
+	# burst; earlier queued zero-speed start frames are not load evidence.
+	for client_index in range(CLIENT_COUNT):
+		for event in _clients[client_index].drain_events():
+			_test.assert_false(
+				int(event.get("opcode", -1)) == OP_ERROR,
+				"client %d input burst must produce no cloud authority error" % client_index
+			)
 
-	var cars := _car_states(CLIENT_COUNT)
-	for sequence in range(SNAPSHOT_BROADCASTS):
-		var snapshot := _make_envelope(
-			OP_STATE_SNAPSHOT,
-			host.session_user_id(),
-			sequence + 1,
-			host.room_epoch(),
-			{"cars": cars},
-			race_tick
-		)
-		var snapshot_send: Dictionary = await host.send_envelope(room_code, snapshot)
-		_test.assert_true(snapshot_send["ok"], "authoritative snapshot %d must queue" % sequence)
-
-	for client_index in range(1, CLIENT_COUNT):
+	var observed_motion := false
+	for client_index in range(CLIENT_COUNT):
 		for sequence in range(SNAPSHOT_BROADCASTS):
 			var delivered: Dictionary = await _clients[client_index].wait_for_opcode_async(
 				OP_STATE_SNAPSHOT, 6000
 			)
-			_test.assert_true(delivered["ok"], "guest %d must receive snapshot %d" % [client_index, sequence])
+			_test.assert_true(delivered["ok"], "client %d must receive cloud snapshot %d" % [client_index, sequence])
 			if delivered["ok"]:
 				_snapshot_delivery_count += 1
+				_test.assert_equal(str(delivered["value"].get("sender_id", "")), "server", "snapshot authority must be the cloud")
 				_test.assert_equal(
 					delivered["value"]["payload"].get("cars", []).size(),
 					CLIENT_COUNT,
 					"each snapshot must preserve all 12 car states"
 				)
-	var expected_snapshot_deliveries := (CLIENT_COUNT - 1) * SNAPSHOT_BROADCASTS
+				for car in delivered["value"]["payload"].get("cars", []):
+					if int(car.get("slot", -1)) > 0 \
+							and (absi(int(car.get("velocity_x_q", 0))) > 0 or absi(int(car.get("velocity_y_q", 0))) > 0):
+						observed_motion = true
+	var expected_snapshot_deliveries := CLIENT_COUNT * SNAPSHOT_BROADCASTS
 	_test.assert_equal(
 		_snapshot_delivery_count,
 		expected_snapshot_deliveries,
-		"all authoritative snapshot fan-out deliveries must arrive"
+		"all cloud snapshot fan-out deliveries must arrive"
 	)
+	_test.assert_true(observed_motion, "cloud simulation must apply submitted throttle to the mobile field")
 
 	for client_index in range(CLIENT_COUNT):
 		for event in _clients[client_index].drain_events():
@@ -340,7 +337,7 @@ func _make_envelope(
 
 
 func _compiled_manifest() -> Dictionary:
-	var source_hash := "2e2e131d3e17420ddea775765e5fcc1ade1b898abd4c4a380d21212825fbb357"
+	var source_hash := "f04a1a8b52de6714af5c29ac9be02656c9cb8944be730e107655ca4f5f5e110a"
 	return {
 		"track_definition": {
 			"schema_version": 2,
@@ -376,6 +373,20 @@ func _compiled_manifest() -> Dictionary:
 		"source_hash": source_hash,
 		"generator_version": 3,
 		"compiled_fingerprint": "e90dedcf44ba60445ad6bc75fe210d6ec4d3e7431d960ff1241b805f7a6448f6",
+		"authority_path": {
+			"scale": 1000,
+			"centerline_q": [
+				[0, 0], [220000, -180000], [620000, -180000], [840000, 0],
+				[840000, 420000], [620000, 600000], [220000, 600000], [0, 420000],
+			],
+			"elevation_q": [0, 0, 0, 0, 0, 0, 0, 0],
+			"track_width_q": 72000,
+			"total_length_q": 2400000,
+			"start_finish_distance_q": 0,
+			"road_surface": "smooth_asphalt",
+			"deterministic_seed": "42",
+			"path_hash": "bb0b8ea0a437a948a596c650364ac96370f664e76a0268af0edcae207329a3f8",
+		},
 	}
 
 
@@ -417,13 +428,13 @@ func _finish() -> void:
 		for failure in result["failures"]:
 			print("  - %s" % failure)
 	print(
-		"LOAD_METRICS protocol=%d clients=%d authentications=%d admissions=%d overflow_refusals=%d input_relayed=%d snapshot_deliveries=%d elapsed_ms=%d" % [
+		"LOAD_METRICS protocol=%d clients=%d authentications=%d admissions=%d overflow_refusals=%d inputs_submitted=%d snapshot_deliveries=%d elapsed_ms=%d" % [
 			PROTOCOL,
 			CLIENT_COUNT,
 			_authentication_count,
 			_admission_count,
 			_overflow_refusal_count,
-			_input_relay_count,
+			_input_submission_count,
 			_snapshot_delivery_count,
 			elapsed_ms,
 		]

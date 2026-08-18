@@ -1,8 +1,9 @@
 class_name NetworkRaceRuntime
 extends RefCounted
-## Client-host race bridge for protocol v1. The room host runs the only full
-## RaceDirector; guests predict their own conventional-control car, reconcile
-## against host snapshots, and interpolate every remote car.
+## Cloud-authoritative race bridge. Every phone predicts only its own
+## conventional-control car, reconciles against Nakama snapshots, and
+## interpolates remote cars. The room creator has lobby controls but never owns
+## race physics, snapshots, or results.
 
 signal outbound_envelope(envelope: Dictionary)
 signal terminal(reason: String)
@@ -56,7 +57,6 @@ var _interpolator := Interpolator.new()
 var _accumulator := 0.0
 var _prediction_sequence := 0
 var _last_command := RaceInputType.new()
-var _awaiting_host_snapshot := false
 var _completion_sent := false
 var _recovery_parity_by_slot: Dictionary = {}
 
@@ -150,60 +150,33 @@ func advance_frame(delta: float, command: RaceInput) -> int:
 	var steps := 0
 	while _accumulator + 0.000000001 >= FIXED_DT and steps < MAX_STEPS_PER_FRAME:
 		_accumulator -= FIXED_DT
-		if is_host:
-			_host_tick()
-		else:
-			_guest_tick()
+		_guest_tick()
 		steps += 1
 	_sample_remote_presentation()
-	if is_host and director.phase == DirectorType.PHASE_RESULTS and not _completion_sent:
-		_publish_completion()
 	return steps
 
 
 func handle_event(event: Dictionary) -> Dictionary:
 	var opcode := int(event.get("opcode", -1))
-	if opcode == Protocol.OP_INPUT_FRAME and is_host:
-		var sender := str(event.get("sender_id", ""))
-		if sender == local_player_id or not _slot_by_player.has(sender):
-			return {"ok": false, "error": {"code": "input_sender_invalid"}}
-		var decoded := Codec.command_from_payload(event.get("payload", {}))
-		if not decoded["ok"]:
-			return decoded
-		_remote_inputs[sender] = {
-			"command": decoded["value"],
-			"tick": int(event.get("tick", global_tick)),
-		}
-		latest_authoritative_tick = maxi(latest_authoritative_tick, int(event.get("payload", {}).get("ack_host_tick", 0)))
-		return {"ok": true}
-	if opcode == Protocol.OP_STATE_SNAPSHOT and not is_host:
+	if opcode == Protocol.OP_INPUT_FRAME:
+		return {"ok": false, "error": {"code": "peer_input_not_consumed"}}
+	if opcode == Protocol.OP_STATE_SNAPSHOT:
 		return _handle_snapshot(event)
 	if opcode == Protocol.OP_RESUME:
 		var resume_snapshot: Variant = event.get("payload", {}).get("authoritative_snapshot")
-		if not is_host and resume_snapshot is Dictionary and not resume_snapshot.is_empty():
+		if resume_snapshot is Dictionary and not resume_snapshot.is_empty():
 			var resumed := _handle_snapshot(resume_snapshot)
 			if not resumed.get("ok", false):
 				return resumed
 		suspended = false
-		_awaiting_host_snapshot = false
 		return {"ok": true}
 	if opcode == Protocol.OP_RACE_EVENT:
 		var event_type := str(event.get("payload", {}).get("type", ""))
 		if event_type == "race_started" and not running:
 			begin(int(event.get("payload", {}).get("tick", start_tick)))
-		elif event_type == "peer_disconnected" and str(event.get("payload", {}).get("player_id", "")) == host_player_id and not is_host:
-			suspended = true
-			_awaiting_host_snapshot = true
-		elif event_type == "peer_resumed" and str(event.get("payload", {}).get("player_id", "")) == host_player_id and not is_host:
-			# Do not resume guest prediction on presence alone. The next full host
-			# snapshot is the authoritative restart boundary.
-			suspended = true
-			_awaiting_host_snapshot = true
 		elif event_type == "peer_departed":
 			var departed := str(event.get("payload", {}).get("player_id", ""))
-			if departed == host_player_id:
-				finish("simulation_host_departed")
-			elif is_host and director != null:
+			if director != null and departed != local_player_id:
 				director.mark_dnf(StringName(departed), &"peer_departed")
 		elif event_type == "race_complete":
 			return _apply_authoritative_results(event.get("payload", {}).get("results", []))
@@ -428,9 +401,6 @@ func _handle_snapshot(event: Dictionary) -> Dictionary:
 		var recovered_car := Codec.car_for_slot(cars, slot)
 		if recovered_entry != null and not recovered_car.is_empty():
 			Codec.apply_car_to_entry(recovered_car, recovered_entry, track)
-	if _awaiting_host_snapshot:
-		_awaiting_host_snapshot = false
-		suspended = false
 	return {"ok": true, "value": {"tick": tick, "cars": cars.size()}}
 
 
@@ -457,7 +427,7 @@ func _detect_recovery_parity_changes(cars: Array) -> Dictionary:
 
 
 func _sample_remote_presentation() -> void:
-	if is_host or _interpolator.buffered_count() == 0:
+	if _interpolator.buffered_count() == 0:
 		return
 	var sampled := _interpolator.sample_delayed(latest_authoritative_tick)
 	if sampled.is_empty():

@@ -28,8 +28,8 @@ fi
 
 failures=0
 expected_bundle_id="com.raceglyph.game"
-expected_marketing_version="0.2.0"
-expected_build_version="2"
+expected_marketing_version="0.4.0"
+expected_build_version="4"
 expected_deployment_target="15.0"
 
 fail_check() {

@@ -106,7 +106,11 @@ func _build_shell() -> void:
 	var title := DesignSystem.title("PRIVATE ROOM", 38)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(title)
-	_status = DesignSystem.label("LOCAL / PRIVATE BACKEND", 14, DesignSystem.MINT)
+	_status = DesignSystem.label(
+		"ONLINE PRIVATE ROOMS" if Endpoint.uses_public_service() else "LOCAL / PRIVATE BACKEND",
+		14,
+		DesignSystem.MINT
+	)
 	_status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	top.add_child(_status)
 
@@ -140,7 +144,11 @@ func _build_entry() -> void:
 	var offline := DesignSystem.button("PLAY OFFLINE INSTEAD", false, true)
 	offline.pressed.connect(func() -> void: navigate_requested.emit("tracks", {}))
 	foot.add_child(offline)
-	_status.text = "LOCAL / PRIVATE BACKEND • OFFLINE PLAY UNAFFECTED"
+	_status.text = (
+		"SECURE GLOBAL SERVICE • OFFLINE PLAY UNAFFECTED"
+		if Endpoint.uses_public_service()
+		else "LOCAL / PRIVATE BACKEND • OFFLINE PLAY UNAFFECTED"
+	)
 	_status.add_theme_color_override("font_color", DesignSystem.MINT)
 
 
@@ -202,6 +210,15 @@ func _build_join_card() -> PanelContainer:
 	content.add_child(_join_button)
 	var split := HSeparator.new()
 	content.add_child(split)
+	if Endpoint.uses_public_service():
+		var service := DesignSystem.label(
+			"SECURE ONLINE SERVICE • HTTPS/WSS • NO PC REQUIRED",
+			12,
+			DesignSystem.MINT
+		)
+		service.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		content.add_child(service)
+		return panel
 	content.add_child(DesignSystem.label("LOCAL BACKEND ENDPOINT", 12, DesignSystem.MUTED))
 	var endpoint_row := HBoxContainer.new()
 	endpoint_row.add_theme_constant_override("separation", 8)
@@ -818,6 +835,8 @@ func _available_tracks() -> Array[Dictionary]:
 
 
 func _endpoint_value() -> Dictionary:
+	if Endpoint.uses_public_service():
+		return Endpoint.from_runtime_overrides()
 	return Endpoint.sanitize({
 		"host": _host_edit.text if _host_edit != null else "",
 		"port": int(_port_spin.value) if _port_spin != null else Endpoint.DEFAULT_PORT,

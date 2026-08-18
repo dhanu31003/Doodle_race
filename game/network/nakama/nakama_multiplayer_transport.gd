@@ -127,6 +127,7 @@ func _prepare_track_manifest(manifest: Dictionary) -> Dictionary:
 		"source_hash": str(validated["source_hash"]),
 		"generator_version": int(validated["generator_version"]),
 		"compiled_fingerprint": str(validated["compiled_fingerprint"]),
+		"authority_path": validated["authority_path"].duplicate(true),
 	}
 	# The successful validation payload owns a decoded TrackDefinition. Release
 	# it before suspending on socket I/O so completed coroutine state cannot keep
@@ -269,6 +270,10 @@ func room_snapshot(room_code: String) -> Dictionary:
 	if room_code.strip_edges().to_upper() != _room_code or _room_state.is_empty():
 		return Result.failure(&"room_snapshot_unavailable", "No authoritative room snapshot has arrived.")
 	return Result.success(_room_state.duplicate(true))
+
+
+func last_server_tick() -> int:
+	return _last_server_tick
 
 
 func drain_events() -> Array[Dictionary]:
@@ -415,9 +420,8 @@ func _on_match_state(match_state: Variant) -> void:
 				return
 			var snapshot: Dictionary = snapshot_value
 			_normalize_wire_integers(snapshot)
-			var expected_host := str(_room_state.get("host_id", ""))
 			var snapshot_validation := Protocol.validate_envelope(
-				snapshot, expected_host, int(envelope["room_epoch"])
+				snapshot, "server", int(envelope["room_epoch"])
 			)
 			if not snapshot_validation["ok"] \
 					or int(snapshot.get("opcode", -1)) != Protocol.OP_STATE_SNAPSHOT:
@@ -459,6 +463,27 @@ func _normalize_wire_integers(envelope: Dictionary) -> void:
 	var payload: Dictionary = payload_value
 	if opcode == Protocol.OP_TRACK_MANIFEST:
 		_normalize_json_integer(payload, "generator_version")
+		var authority_path_value: Variant = payload.get("authority_path")
+		if authority_path_value is Dictionary:
+			for key in ["scale", "track_width_q", "total_length_q", "start_finish_distance_q"]:
+				_normalize_json_integer(authority_path_value, key)
+			var centerline_value: Variant = authority_path_value.get("centerline_q")
+			if centerline_value is Array:
+				for point_value in centerline_value:
+					if point_value is Array and point_value.size() == 2:
+						for coordinate_index in 2:
+							var coordinate: Variant = point_value[coordinate_index]
+							if typeof(coordinate) == TYPE_FLOAT and not is_nan(coordinate) and not is_inf(coordinate) \
+									and coordinate == floor(coordinate) \
+									and absf(coordinate) <= float(Limits.MAX_SAFE_SEQUENCE):
+								point_value[coordinate_index] = int(coordinate)
+			var elevation_value: Variant = authority_path_value.get("elevation_q")
+			if elevation_value is Array:
+				for elevation_index in elevation_value.size():
+					var elevation: Variant = elevation_value[elevation_index]
+					if typeof(elevation) == TYPE_FLOAT and not is_nan(elevation) and not is_inf(elevation) \
+							and elevation == floor(elevation):
+						elevation_value[elevation_index] = int(elevation)
 	elif opcode == Protocol.OP_ROOM_CONFIG:
 		_normalize_json_integer(payload, "laps")
 		var config_value: Variant = payload.get("race_config")
@@ -513,7 +538,7 @@ func _normalize_snapshot_cars(payload: Dictionary) -> void:
 			"gear", "engine_rpm_q", "shift_ticks", "steering_q", "slip_angle_q",
 			"wheel_slip_q", "lateral_accel_q", "contact_serial", "contact_tick",
 			"contact_speed_q", "contact_x_q", "contact_y_q", "contact_normal_x_q",
-			"contact_normal_y_q",
+			"contact_normal_y_q", "vertical_offset_q", "vertical_velocity_q", "grounded",
 		]:
 			_normalize_json_integer(car, key)
 

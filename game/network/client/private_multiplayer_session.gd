@@ -631,9 +631,14 @@ func _verify_manifest_and_report_async(manifest: Dictionary) -> void:
 	if validation["ok"]:
 		var decoded: TrackDefinition = validation["value"]["definition"]
 		var compiled_result: TrackCompileResult = Compiler.compile(decoded)
+		var local_authority_path := (
+			Manifest.build_authority_path(compiled_result.track)
+			if compiled_result.succeeded() and compiled_result.track != null else {}
+		)
 		if compiled_result.succeeded() and compiled_result.track != null \
 				and compiled_result.track.source_hash == str(manifest["source_hash"]) \
-				and compiled_result.track.compile_hash == str(manifest["compiled_fingerprint"]):
+				and compiled_result.track.compile_hash == str(manifest["compiled_fingerprint"]) \
+				and local_authority_path == manifest["authority_path"]:
 			_current_definition = decoded
 			_current_compiled = compiled_result.track
 			report = {
@@ -755,7 +760,7 @@ func _friendly_error(code: String, fallback: String = "") -> String:
 		"update_required":
 			return "UPDATE REQUIRED • This build is incompatible with the private-room service. Update RaceGlyph before joining."
 		"rematch_unavailable":
-			return "Rematch becomes available after the host publishes authoritative results."
+			return "Rematch becomes available after the cloud authority finalizes the race results."
 		"reconnect_expired", "resume_membership_missing", "nakama_resume_timeout":
 			return "The 20-second reconnect window expired. Return to Private Room to join again."
 		"track_identity_mismatch":

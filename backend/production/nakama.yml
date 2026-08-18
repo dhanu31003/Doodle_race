@@ -1,0 +1,24 @@
+name: raceglyph-prod
+data_dir: /nakama/data
+shutdown_grace_sec: 15
+
+logger:
+  level: INFO
+  stdout: true
+  format: JSON
+
+session:
+  token_expiry_sec: 7200
+  refresh_token_expiry_sec: 2592000
+
+socket:
+  max_message_size_bytes: 131072
+  max_request_size_bytes: 131072
+
+database:
+  max_open_conns: 40
+  max_idle_conns: 10
+  conn_max_lifetime_ms: 3600000
+
+runtime:
+  path: /nakama/data/modules

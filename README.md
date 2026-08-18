@@ -12,7 +12,7 @@ The name **RaceGlyph has not received trademark, store-name, domain, or other le
 - Deterministic circuits: canonical versioned JSON, content hashes, road/curbs/runoff/barriers, pits, grid, checkpoints, lanes, minimap, bridges, recovery data, seeded forest decoration, and five selectable road surfaces with distinct road texture, vehicle coating, moving effects, and authoritative handling.
 - Offline racing: one player plus 1–11 AI opponents, conventional steering/accelerator/brake-reverse controls, assists, collisions, recovery, bounded gravity-driven crest airtime, smoothly grade-following cockpit/chase views, HUD/pause, a live post-finish full-field classification with exact times, effects, and category audio.
 - Content and presentation: six predefined circuits, eight original fictional car colorways, a complete forest theme, responsive safe-area UI, accessibility controls, credits, and licenses.
-- Private multiplayer: up to 12 humans through pinned Nakama/PostgreSQL, anonymous sessions, create/code-join, host authority, explicit lock/readiness, custom-track hash verification, relay/prediction, reconnect, host departure, results/share/rematch, and offline fallback. Private-room AI fill is intentionally deferred from v1.
+- Private multiplayer: up to 12 humans through pinned Nakama/PostgreSQL, anonymous sessions, create/code-join, cloud-owned 60 Hz race authority, first-frame local prediction, server reconciliation, explicit lock/readiness, custom-track hash verification, reconnect, creator handover, server results/share/rematch, and offline fallback. No player's phone or PC hosts the race. Private-room AI fill is intentionally deferred from v1.
 - Local data controls: atomic versioned persistence, corruption fallback/migrations, portable local export, and Delete All Local Data with runtime token/session clearing.
 
 ## Frozen verification record
@@ -101,6 +101,7 @@ The release mode starts and tears down disposable local Nakama/PostgreSQL resour
 - AI contract: [`docs/AI.md`](docs/AI.md)
 - Multiplayer wire contract: [`docs/NETWORK_PROTOCOL.md`](docs/NETWORK_PROTOCOL.md)
 - Backend operations: [`docs/BACKEND_OPERATIONS.md`](docs/BACKEND_OPERATIONS.md)
+- Public mobile multiplayer deployment: [`docs/BACKEND_PRODUCTION.md`](docs/BACKEND_PRODUCTION.md)
 - Art and licensing: [`docs/ART_DIRECTION.md`](docs/ART_DIRECTION.md), [`docs/ASSET_LICENSES.md`](docs/ASSET_LICENSES.md)
 - Performance and devices: [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md), [`docs/DEVICE_MATRIX.md`](docs/DEVICE_MATRIX.md)
 - Privacy and release: [`docs/PRIVACY_DATA_MAP.md`](docs/PRIVACY_DATA_MAP.md), [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md)

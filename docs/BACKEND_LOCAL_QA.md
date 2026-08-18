@@ -2,13 +2,13 @@
 
 These drills are deliberately local-only. They create uniquely named Compose projects, use disposable volumes, publish Nakama only on `127.0.0.1`, retain no database dump or session response, and tear everything down on success, failure, or interruption.
 
-## Real 12-client room and relay smoke
+## Real 12-client cloud-authority smoke
 
 ```sh
 backend/scripts/run_local_12_client_load.sh
 ```
 
-The runner starts a clean Nakama/PostgreSQL stack, authenticates 13 distinct device sessions, admits exactly 12, verifies the thirteenth receives `room_full`, synchronizes one canonical track, proves the all-ready start gate, and exercises 55 guest-to-host input relays plus 33 host-to-guest snapshot deliveries. Any Godot warning, error, resource/ObjectDB leak, incomplete metric, backend panic/fatal/error, JavaScript exception, or token/credential-shaped log output fails the run.
+The runner starts a clean Nakama/PostgreSQL stack, authenticates 13 distinct device sessions, admits exactly 12, verifies the thirteenth receives `room_full`, synchronizes one canonical track/authority path, proves the all-ready start gate, submits 55 phone inputs, and observes 36 cloud snapshot deliveries with non-zero server-owned movement. Any Godot warning, error, resource/ObjectDB leak, incomplete metric, backend panic/fatal/error, JavaScript exception, or token/credential-shaped log output fails the run.
 
 ## PostgreSQL backup and isolated restore drill
 

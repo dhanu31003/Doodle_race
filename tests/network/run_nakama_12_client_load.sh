@@ -44,7 +44,7 @@ if ! grep -F 'PASS nakama_real_12_client_load' "${log_file}" >/dev/null 2>&1; th
   echo "12-client load smoke did not reach its passing terminal assertion." >&2
   exit 1
 fi
-if ! grep -E '^LOAD_METRICS protocol=2 clients=12 authentications=13 admissions=12 overflow_refusals=1 input_relayed=55 snapshot_deliveries=33 elapsed_ms=[0-9]+$' \
+if ! grep -E '^LOAD_METRICS protocol=4 clients=12 authentications=13 admissions=12 overflow_refusals=1 inputs_submitted=55 snapshot_deliveries=36 elapsed_ms=[0-9]+$' \
     "${log_file}" >/dev/null 2>&1; then
   echo "12-client load smoke emitted incomplete relay metrics." >&2
   exit 1

@@ -51,9 +51,9 @@ RaceGlyph (provisional name; no legal clearance) turns a single hand-drawn loop 
 - Host configures laps/collisions, kicks, and explicitly locks or unlocks the grid before countdown. Locking closes invites and freezes circuit/rule/kick changes, while verified members may still acknowledge Ready; start requires a locked, fully ready grid.
 - Every member selects an original fictional team/car. The authoritative roster carries those selections into the lobby and race presentation.
 - Admission requires an exact app-build/protocol/schema/generator/platform tuple. Track readiness separately requires the same canonical definition hash and successful local generation; incompatibility opens a blocking update-required surface while offline play remains available.
-- The race HUD includes sector timing; guest-local sector prediction is labeled `LOCAL` and is never presented as host authority.
-- Authoritative results can be copied without room codes or internal peer identifiers. Guests may request a rematch; only the host can reset the same verified room, preserving the grid lock while clearing Ready acknowledgements.
-- Casual host-authority model; no ranked mode or strong anti-cheat in v1.
+- The race HUD includes sector timing; client-predicted sector data is labeled `LOCAL` and is never presented as cloud-authoritative.
+- Cloud-authored results can be copied without room codes or internal peer identifiers. Guests may request a rematch; only the current room administrator can reset the same verified room, preserving the grid lock while clearing Ready acknowledgements.
+- Cloud-authoritative private-room model with first-frame local prediction; no ranked mode or complete commercial anti-cheat claim in v1.
 
 ## Screens
 

@@ -97,7 +97,7 @@ func start_countdown(room_code: String) -> Dictionary:
 
 func _compatibility() -> Dictionary:
 	return {
-		"app_build": "0.3.0",
+		"app_build": "0.4.0",
 		"protocol_version": PROTOCOL,
 		"track_schema_version": 2,
 		"generator_version": 3,
@@ -140,6 +140,10 @@ func session_user_id() -> String:
 
 func room_epoch() -> int:
 	return _room_epoch
+
+
+func last_server_tick() -> int:
+	return _last_server_tick
 
 
 func close() -> void:

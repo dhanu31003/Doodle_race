@@ -2,8 +2,8 @@ class_name NetworkLimits
 extends RefCounted
 ## Versioned multiplayer limits shared by transports, clients, and tests.
 
-const PROTOCOL_VERSION: int = 3
-const APP_BUILD_ID: String = "0.3.0"
+const PROTOCOL_VERSION: int = 4
+const APP_BUILD_ID: String = "0.4.0"
 const TRACK_SCHEMA_VERSION: int = 2
 const TRACK_GENERATOR_VERSION: int = 3
 const SUPPORTED_PLATFORMS: Array[String] = ["android", "ios", "linux", "macos", "web", "windows"]
@@ -26,9 +26,9 @@ const SIMULATION_HZ: int = 60
 const INPUT_SUBMISSION_MIN_HZ: int = 10
 const INPUT_SUBMISSION_MAX_HZ: int = 20
 const AUTHORITATIVE_SNAPSHOT_MIN_HZ: int = 10
-const AUTHORITATIVE_SNAPSHOT_MAX_HZ: int = 15
+const AUTHORITATIVE_SNAPSHOT_MAX_HZ: int = 20
 const INPUT_INTERVAL_MS: int = 1000 / INPUT_SUBMISSION_MAX_HZ
-const SNAPSHOT_INTERVAL_MS: int = 1000 / 12
+const SNAPSHOT_INTERVAL_MS: int = 1000 / AUTHORITATIVE_SNAPSHOT_MAX_HZ
 const MAX_INPUT_FRAMES_PER_SECOND: int = INPUT_SUBMISSION_MAX_HZ
 const MAX_SNAPSHOTS_PER_SECOND: int = AUTHORITATIVE_SNAPSHOT_MAX_HZ
 const MAX_CONTROL_MESSAGES_PER_SECOND: int = 12
@@ -79,7 +79,7 @@ const ROOM_RESULTS: StringName = &"RESULTS"
 const ROOM_CLOSED: StringName = &"CLOSED"
 
 const HOST_DEPARTURE_LOBBY_POLICY: StringName = &"transfer_oldest_connected"
-const HOST_DEPARTURE_RACE_POLICY: StringName = &"end_race"
+const HOST_DEPARTURE_RACE_POLICY: StringName = &"continue_cloud"
 
 
 static func is_valid_multiplayer_lap_count(value: Variant) -> bool:

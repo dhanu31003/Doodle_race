@@ -1,6 +1,6 @@
 # Backend Operations
 
-Status: **implemented local-candidate runbook**. Compose configuration, the JavaScript RPC/match module, health checks, clean-room E2E/load runners, and an isolated backup/restore drill exist. Their exact candidate outcomes belong in `TEST_REPORT.md`; nothing here claims staging, TLS, production retention, encrypted off-site backups, or a public service.
+Status: **implemented local-candidate runbook plus a production mobile deployment topology**. Local Compose, the JavaScript RPC/match module, health checks, clean-room E2E/load runners, and an isolated backup/restore drill exist. A Caddy/TLS/Nakama/PostgreSQL production stack and external HTTPS/WSS smoke are defined under `backend/production/`; they are not evidence that a cloud host, DNS record, backups, monitoring, or public service is already live. See [`BACKEND_PRODUCTION.md`](BACKEND_PRODUCTION.md).
 
 ## Selected candidate
 
@@ -15,7 +15,7 @@ Before staging, refresh dependency/SBOM and vulnerability evidence, re-verify th
 
 ## Intended responsibilities
 
-Nakama provides anonymous session authentication, short-code room RPCs, membership/presence, relayed match traffic, and room lifecycle state. The client host simulates a v1 race. A canonical track definition is held only in transient match state and relayed to members; the v1 module does not provide a persistent user-track service. PostgreSQL persists Nakama accounts, devices, storage-backed room-code directory entries, and migration metadata. Generated geometry, decoration, and pixels never enter backend authority.
+Nakama provides anonymous session authentication, short-code room RPCs, membership/presence, room lifecycle, input validation, 60 Hz cloud race simulation, and 20 Hz server snapshots. A canonical track definition and bounded hashed authority path are held only in transient match state; the module does not provide persistent user-track storage. PostgreSQL persists Nakama accounts, devices, storage-backed room-code directory entries, and migration metadata. Generated scenery and pixels never enter backend authority.
 
 ## Implemented layout
 
@@ -32,6 +32,10 @@ backend/
   scripts/run_local_e2e.sh
   scripts/run_local_12_client_load.sh
   scripts/run_backup_restore_drill.sh
+  production/compose.yaml
+  production/Caddyfile
+  production/nakama.yml
+  production/scripts/
 ```
 
 There is no project-owned database schema in v1; Nakama applies its pinned migrations during container startup.
@@ -54,9 +58,12 @@ backend/scripts/validate_compose.sh
 backend/scripts/run_local_e2e.sh
 backend/scripts/run_local_12_client_load.sh
 backend/scripts/run_backup_restore_drill.sh
+backend/production/scripts/validate.sh
 ```
 
 The runners use `backend/.env.example` only inside uniquely named disposable local Compose projects, publish Nakama on loopback, remove volumes and temporary credentials/responses/dumps on exit, and retain only redacted evidence summaries where specified. Never reuse those placeholder values outside the disposable local drills.
+
+The production stack publishes only Caddy on TCP 80/443 and UDP 443. PostgreSQL and Nakama remain on an internal network, the Nakama console is not exposed, TLS is automatic for `multiplayer.neutale.com`, and Caddy access logs are disabled to prevent authentication material in WebSocket URIs from entering proxy logs.
 
 ## Configuration and secrets
 

@@ -117,7 +117,8 @@ if [[ ${WITH_SOAK} -eq 1 ]]; then
 fi
 
 if [[ ${WITH_BACKEND} -eq 1 ]]; then
-	run_case "backend compose configuration" backend/scripts/validate_compose.sh
+  run_case "backend compose configuration" backend/scripts/validate_compose.sh
+  run_case "production mobile backend topology" backend/production/scripts/validate.sh
   run_case "real Nakama end to end" backend/scripts/run_local_e2e.sh
 fi
 

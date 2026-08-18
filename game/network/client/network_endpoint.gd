@@ -1,20 +1,45 @@
 class_name NetworkEndpoint
 extends RefCounted
-## Local/private Nakama endpoint configuration. Defaults deliberately target
-## loopback on desktop and Android emulator host forwarding; no public service
-## is implied or contacted without an explicit override.
+## Nakama endpoint configuration. Mobile release builds connect to the public
+## TLS service without exposing engineering controls. Desktop/headless builds
+## retain loopback defaults for local QA and backend development.
 
 const DEFAULT_PORT := 7350
 const DEFAULT_SERVER_KEY := "defaultkey"
+const PUBLIC_HOST := "multiplayer.neutale.com"
+const PUBLIC_PORT := 443
+# Nakama's client server key is an application identifier embedded in every
+# client, not an authorization secret. RPCs still authenticate users and verify
+# room membership/authority server-side.
+const PUBLIC_SERVER_KEY := "raceglyph_mobile_protocol_4"
 
 
-static func defaults() -> Dictionary:
+static func uses_public_service() -> bool:
+	return OS.get_name() in ["Android", "iOS"]
+
+
+static func development_defaults_for_platform(platform: String) -> Dictionary:
 	return {
-		"host": "10.0.2.2" if OS.get_name() == "Android" else "127.0.0.1",
+		"host": "10.0.2.2" if platform == "Android" else "127.0.0.1",
 		"port": DEFAULT_PORT,
 		"server_key": DEFAULT_SERVER_KEY,
 		"scheme": "http",
 	}
+
+
+static func public_defaults() -> Dictionary:
+	return {
+		"host": PUBLIC_HOST,
+		"port": PUBLIC_PORT,
+		"server_key": PUBLIC_SERVER_KEY,
+		"scheme": "https",
+	}
+
+
+static func defaults() -> Dictionary:
+	if uses_public_service():
+		return public_defaults()
+	return development_defaults_for_platform(OS.get_name())
 
 
 static func from_runtime_overrides(base: Dictionary = {}) -> Dictionary:

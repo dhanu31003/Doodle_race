@@ -8,8 +8,8 @@ fi
 
 apk_path="${1:-builds/android/RaceGlyph-candidate.apk}"
 expected_package="com.raceglyph.game"
-expected_version_code="2"
-expected_version_name="0.2.0"
+expected_version_code="4"
+expected_version_name="0.4.0"
 expected_min_sdk="24"
 expected_target_sdk="36"
 expected_native_code="'arm64-v8a'"

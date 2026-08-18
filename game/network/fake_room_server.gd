@@ -309,6 +309,7 @@ func start_countdown(connection_id: String, room_code: String) -> Dictionary:
 		"track_identity": TrackManifest.identity(room["track_manifest"]),
 		"roster": _roster(room),
 		"race_config": room["race_config"].duplicate(true),
+		"authority": "cloud",
 	}
 	room["countdown"] = countdown
 	room["state"] = str(Limits.ROOM_COUNTDOWN)
@@ -525,6 +526,23 @@ func current_tick() -> int:
 	return _server_tick
 
 
+func complete_cloud_race_for_test(room_code: String, results: Array) -> Dictionary:
+	var normalized := room_code.strip_edges().to_upper()
+	if not _rooms.has(normalized):
+		return Result.failure(&"room_not_found", "Private room was not found.")
+	var room: Dictionary = _rooms[normalized]
+	if room["state"] != str(Limits.ROOM_RACING):
+		return Result.failure(&"race_not_running", "Cloud race is not running.")
+	room["state"] = str(Limits.ROOM_RESULTS)
+	_broadcast_room_event(room, Protocol.OP_RACE_EVENT, {
+		"type": "race_complete",
+		"results": results.duplicate(true),
+		"authority": "cloud",
+	})
+	_broadcast_room_config(room)
+	return Result.success({"state": room["state"], "results": results.size()})
+
+
 func now_ms() -> int:
 	return _now_ms
 
@@ -550,46 +568,18 @@ func _handle_input_frame(room: Dictionary, member: Dictionary, message: Dictiona
 		return Result.failure(&"input_ack_future", "Acknowledged host tick is impossible.")
 	member["last_input_sequence"] = sequence
 	member["last_input_tick"] = tick
-	if room["host_id"] != member["player_id"]:
-		_queue_event(room["host_id"], message.duplicate(true))
+	member["latest_input"] = message["payload"].duplicate(true)
 	return Result.success({"accepted_sequence": sequence, "accepted_tick": tick})
 
 
 func _handle_state_snapshot(room: Dictionary, member: Dictionary, message: Dictionary) -> Dictionary:
-	if room["host_id"] != member["player_id"]:
-		return Result.failure(&"host_only", "Only the simulation host may publish authoritative snapshots.")
-	if not _consume_rate(
-			"snapshot:%s:%s" % [room["code"], member["player_id"]],
-			Limits.MAX_SNAPSHOTS_PER_SECOND,
-			1000
-		):
-		return Result.failure(&"snapshot_rate_limited", "Snapshot publication exceeds 15 frames per second.")
-	var sequence := int(message["seq"])
-	var tick := int(message["tick"])
-	if sequence <= int(room["last_snapshot_sequence"]):
-		return Result.failure(&"snapshot_sequence_stale", "Snapshot sequence is duplicate or out of order.")
-	if tick < int(room["last_snapshot_tick"]):
-		return Result.failure(&"snapshot_tick_stale", "Snapshot tick moved backwards.")
-	if tick > _server_tick + Limits.MAX_FUTURE_INPUT_TICKS:
-		return Result.failure(&"snapshot_tick_future", "Snapshot is too far ahead of server time.")
-	room["last_snapshot_sequence"] = sequence
-	room["last_snapshot_tick"] = tick
-	room["latest_snapshot"] = message.duplicate(true)
-	for player_id in room["member_order"]:
-		if player_id != room["host_id"] and room["members"].has(player_id) \
-				and room["members"][player_id]["connected"]:
-			_queue_event(player_id, message.duplicate(true))
-	return Result.success({"accepted_sequence": sequence, "accepted_tick": tick})
+	return Result.failure(&"server_authority_only", "Cloud authority alone publishes race snapshots.")
 
 
 func _handle_race_event(room: Dictionary, member: Dictionary, message: Dictionary) -> Dictionary:
-	if room["host_id"] != member["player_id"]:
-		return Result.failure(&"host_only", "Only the simulation host may publish race completion.")
-	if str(message["payload"].get("type", "")) != "race_complete":
-		return Result.failure(&"race_event_type_invalid", "Race event is not accepted from a peer.")
-	room["state"] = str(Limits.ROOM_RESULTS)
-	_broadcast_room_event(room, Protocol.OP_RACE_EVENT, message["payload"].duplicate(true))
-	return Result.success({"state": room["state"], "results": message["payload"]["results"].size()})
+	if str(message["payload"].get("type", "")) == "race_complete":
+		return Result.failure(&"server_authority_only", "Cloud authority alone publishes race results.")
+	return Result.failure(&"race_event_type_invalid", "Race event is not accepted from a peer.")
 
 
 func _add_member(
@@ -618,6 +608,7 @@ func _add_member(
 		"ready": false,
 		"last_input_sequence": -1,
 		"last_input_tick": -1,
+		"latest_input": {"steering": 0, "throttle": 0, "brake": 0},
 		"malformed_count": 0,
 		"quarantined": false,
 	}
@@ -648,19 +639,18 @@ func _permanent_departure(room: Dictionary, player_id: String, reason: String, p
 			"reason": reason,
 		})
 		return
-	if room["state"] == str(Limits.ROOM_COUNTDOWN) or room["state"] == str(Limits.ROOM_RACING) \
-			or room["state"] == str(Limits.ROOM_RESULTS):
-		_close_room(room, "simulation_host_departed")
-		return
 	var successor := _oldest_connected_member(room)
 	if successor.is_empty():
 		_close_room(room, "host_departed_empty_room")
 		return
 	room["host_id"] = successor
-	room["epoch"] = int(room["epoch"]) + 1
-	room["last_snapshot_sequence"] = -1
-	room["last_snapshot_tick"] = -1
-	if not room["track_manifest"].is_empty():
+	if room["state"] != str(Limits.ROOM_COUNTDOWN) and room["state"] != str(Limits.ROOM_RACING) \
+			and room["state"] != str(Limits.ROOM_RESULTS):
+		room["epoch"] = int(room["epoch"]) + 1
+		room["last_snapshot_sequence"] = -1
+		room["last_snapshot_tick"] = -1
+	if not room["track_manifest"].is_empty() and room["state"] != str(Limits.ROOM_COUNTDOWN) \
+			and room["state"] != str(Limits.ROOM_RACING) and room["state"] != str(Limits.ROOM_RESULTS):
 		room["state"] = str(Limits.ROOM_READY) if _all_generation_verified(room) else str(Limits.ROOM_TRACK_SYNC)
 	_broadcast_room_config(room)
 
@@ -749,6 +739,7 @@ func _room_public_view(room: Dictionary) -> Dictionary:
 		"members": _roster(room),
 		"track_identity": TrackManifest.identity(room["track_manifest"]),
 		"race_config": room["race_config"].duplicate(true),
+		"authority": "cloud",
 		"join_locked": bool(room.get("join_locked", false)),
 		"countdown": room["countdown"].duplicate(true),
 		"close_reason": room["close_reason"],

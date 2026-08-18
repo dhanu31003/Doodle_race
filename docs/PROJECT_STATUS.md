@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-07-26 (Asia/Kolkata)
+Last updated: 2026-08-18 (Asia/Kolkata)
 
 ## Goal
 
@@ -13,13 +13,13 @@ The earlier local candidate reached the autonomous contract's original stopping 
 
 ## Current phase
 
-**The chase/slope, surface-effects, and automatic Track Studio revision passes the complete normal local gate. A fresh one-shot immutable-candidate release gate, protocol-3 backend component requalification, and physical-device qualification remain open.**
+**The mobile game baseline remains locally qualified and protocol 4 now provides cloud-owned online race simulation with first-frame client prediction. Public AWS deployment, a fresh one-shot immutable-candidate release gate, and physical-device qualification remain open.**
 
 This wording is deliberate. “Feature-complete” applies to the implemented v1 game and local backend scope. It does not mean store-ready, physically qualified, signed, publicly hosted, legally cleared, tagged, or reproducible from a clean checkout.
 
 ## Current mobile-quality requalification
 
-- Current source is version `0.3.0`, protocol `3`, track schema `2`, and generator `3`. It adds smooth, weathered, bumpy, gravel, and mud profiles to Track Studio and the predefined catalog. Drive efficiency, speed drag, grip, braking, rolling resistance, AI pace, grounded suspension response, road texture, car coating, rain/spray, and loose road detail share one deterministic style. A five-second authority proof reaches 188.58/140.44/136.65/83.72/54.74 speed units respectively, so the selection creates a large verified performance difference. Mud now starts clean and progressively turns the player body, accents and wheels brown across ten bounded stages. Mobile opponents use three tint stages with no splatter node, while one player coating draw, one 12-particle rear wake, and 20 static details retain the visible effect.
+- Current source is version `0.4.0`, protocol `4`, track schema `2`, and generator `3`. Protocol 4 replaces client-host racing with Nakama-owned 60 Hz simulation and 20 Hz server snapshots; every phone sends controls, predicts its own response immediately, and reconciles to cloud state. The verified track manifest now carries hashed bounded authority geometry, clients cannot publish snapshots/results, and creator departure transfers administration without stopping the race. The existing smooth, weathered, bumpy, gravel, and mud profiles remain part of the deterministic content baseline.
 - The exact 160 mph crest fixture now launches at 4.600 m/s, remains airborne for 1.683 seconds, reaches 7.033 m maximum road clearance, and lands exactly under standard gravity. Tyre acceleration, braking, steering, and rolling forces do not act while airborne.
 - Full normal gate: `PASS all requested checks`; 4,706 focused assertions plus a six-circuit/72-car finish smoke, 13 clean UI routes, 26 accessibility layouts, and source/editor/audio-playback checks. Evidence: [`../evidence/logs/full-check-20260725T192237Z.log`](../evidence/logs/full-check-20260725T192237Z.log), SHA-256 `fac5a01f2c6db14d9a8c780e9fb735ccf52bb5325ac993615eb1a339f8dcba82`.
 - Fresh visual review proves that bumpy asphalt uses irregular repairs/cracks, body dust and loose chips; gravel uses multiscale aggregate, tan vehicle dust, rounded stones and a dust plume; and Mud reaches 94.1% accumulation with all ten player splatter instances, 0.891 opacity, a strongly browned body/wheel finish, one rear wake, 48 pooled particles, and 20 road details: [current Mud capture](../evidence/screenshots/mud_optimized_20260726.png). Weathered asphalt retains its wet film, light rain and mist.
@@ -40,7 +40,7 @@ This wording is deliberate. “Feature-complete” applies to the implemented v1
 - Finishing no longer freezes offline authority. Remaining AI keep racing and the result overlay changes from `LIVE CLASSIFICATION • x/12 COMPLETE` to `FULL CLASSIFICATION • 12 DRIVERS`, filling every exact finish time as it arrives and enabling sharing only after the field is terminal: [live](../evidence/screenshots/surface_results_camera_20260725/results-live.png) and [final](../evidence/screenshots/surface_results_camera_20260725/results-final.png).
 - Current release components are all green in combined evidence. The one-shot [`../evidence/logs/full-check-20260724T142719Z.log`](../evidence/logs/full-check-20260724T142719Z.log), SHA-256 `3727c0960a494ef71745cb8a72dbefe496fcb54e85ae63e6d67cd4d409194682`, passed every pre-soak check and all AI correctness, then stopped solely because 2,075,104 ms exceeded the obsolete 900,000 ms host wall gate inherited from the shorter tracks.
 - Coverage was not reduced. The rebaselined schema-2 [`../evidence/runtime/ai_soak_report.json`](../evidence/runtime/ai_soak_report.json), SHA-256 `aeb497dd8dc6b3c5e439eb03b14b6437e6f75f527923e90c8b45afa63abc2247`, passed in 2,084,371 ms under a 2,700,000 ms ceiling and at 1,407.6 authority vehicle-steps/s above the 1,100 minimum: 122,246 primary ticks, 2,933,904 twin vehicle-steps, 4/4 representative runs, 20/20 corpus tracks, 288/288 car entries finished deterministically, and zero DNF/invalid/non-finite/stuck/recovery outcomes.
-- Current backend component reruns passed: real Nakama E2E 102 assertions; 12-client load 1,011 assertions ([log](../evidence/logs/nakama-12-client-load-20260724T154614Z.log), SHA-256 `e91055a45f4f2aa442db43ce659cfeff7978d099831f53a491d2640023bc386a`); isolated PostgreSQL backup/restore 12 checks ([log](../evidence/logs/postgres-backup-restore-20260724T154648Z.log), SHA-256 `782bfd3907de2983f75766e7f856aba977f573f13f11862f867c5616695a7bde`). This combined record is not misrepresented as a new one-shot `--release` PASS.
+- Current protocol-4 reruns passed 401 deterministic network assertions, 89 real Nakama E2E assertions (including reconnect and cloud continuation after creator departure), and a 1,002-assertion 12-client load with 12 admissions, one expected overflow refusal, 55 submitted inputs, and 36 observed cloud snapshot deliveries. Backend logs contained no fatal/runtime errors. Historical backup/restore evidence remains separate; this component record is not misrepresented as a new one-shot `--release` PASS.
 
 ## Completed implementation
 
@@ -57,7 +57,7 @@ This wording is deliberate. “Feature-complete” applies to the implemented v1
 
 Private-room AI fill, ranked/public matchmaking, chat/economy/ads, strong anti-cheat, and public deployment are explicit v1 exclusions, not missing features.
 
-The tested private-room backend is local/loopback only. A public TLS/WSS deployment plus managed mobile endpoint/key is still required before internet-connected phones can join. The approximately 30-bit friend code and identity/node-local rate limit are appropriate to the private-friends scope, not public-scale brute-force protection, and the race host remains trusted for snapshots/results rather than cheat-resistant.
+The tested private-room backend remains local evidence, but the mobile production path is implemented in source: Android/iOS default to `https://multiplayer.neutale.com:443`, engineering endpoint controls are hidden, and a pinned Caddy/TLS/Nakama/PostgreSQL stack exposes only public web ingress. Nakama—not the creating phone—owns race snapshots/results. An authorized AWS account, DNS record, production secrets, external smoke, monitoring/backups, and two-phone qualification are still required before internet-connected phones can actually join.
 
 ## Superseded frozen verification baseline
 

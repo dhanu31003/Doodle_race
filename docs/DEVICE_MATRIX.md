@@ -49,7 +49,7 @@ These observations are not physical performance, thermal, haptic, lifecycle, con
 
 These checks make every release component green in combined local evidence. They do not produce physical-device, network-radio, public-service, or one-shot immutable-candidate proof.
 
-Private-room mobile lifecycle, system Back, leave, reconnect, ready-phase, kick, and rejoin-ban behavior is covered by deterministic and disposable local tests, but two-phone internet validation remains blocked. The supplied Compose service binds loopback and no public TLS/WSS endpoint or managed mobile endpoint/key is configured. Even after hosting, the 30-bit friend code and identity/node-local limiter are not public-scale brute-force protection, and the simulation host remains trusted for snapshots/results.
+Private-room mobile lifecycle, system Back, leave, reconnect, ready-phase, creator handover, kick, and rejoin-ban behavior is covered by deterministic and disposable local tests, but two-phone internet validation remains blocked. The production Compose/TLS topology and mobile endpoint are configured in source but no public AWS host or DNS evidence exists yet. The roughly 30-bit friend code and identity/node-local limiter remain private-friends controls. Protocol 4 puts snapshots/results in the cloud instead of trusting a phone, but does not claim complete ranked anti-cheat.
 
 ## Per-device manual script
 
