@@ -15,6 +15,7 @@ const PredefinedTrackCatalogType := preload("res://game/content/predefined_track
 const MinimapType := preload("res://game/ui/components/race_minimap.gd")
 const TelemetryClusterType := preload("res://game/ui/components/race_telemetry_cluster.gd")
 const StandingsPanelType := preload("res://game/ui/components/race_standings_panel.gd")
+const MobileSteeringWheelType := preload("res://game/ui/components/mobile_steering_wheel.gd")
 
 const PLAYER_ID: StringName = &"player"
 const DEFAULT_TOTAL_LAPS: int = 3
@@ -57,9 +58,6 @@ var total_laps := DEFAULT_TOTAL_LAPS
 var racer_count := DEFAULT_RACER_COUNT
 var ai_difficulty := float(DIFFICULTY_VALUES["standard"])
 var vehicle_collisions_enabled := true
-var _wheel_touch_index := -1
-var _touch_left_held := false
-var _touch_right_held := false
 var _last_player_command: RaceInput = null
 
 var telemetry_cluster: RaceTelemetryCluster
@@ -337,7 +335,7 @@ func _build_telemetry_overlay() -> void:
 	# Keep the instrument above the tallest/lifted touch surface. A separate
 	# SafeMarginContainer applies display cutouts and the home indicator without
 	# coupling the high-frequency telemetry repaint to the control layout.
-	var controls_height := 82.0 * settings.touch_control_size
+	var controls_height := 136.0 * settings.touch_control_size
 	var bottom_clearance := 26.0 + controls_height + 20.0 \
 		+ touch_control_lift_px(settings.touch_control_vertical_offset)
 	var telemetry_safe := DesignSystem.make_margin(28, 24, 28, roundi(bottom_clearance))
@@ -386,26 +384,14 @@ func _steering_controls() -> Control:
 		tilt_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		tilt_panel.add_child(tilt_label)
 		return tilt_panel
-	if settings.touch_control_scheme == GameSettings.CONTROL_WHEEL:
-		var wheel := PanelContainer.new()
-		wheel.custom_minimum_size = _control_size(Vector2(224.0, 82.0))
-		wheel.modulate.a = settings.touch_control_opacity
-		wheel.mouse_filter = Control.MOUSE_FILTER_STOP
-		wheel.add_theme_stylebox_override("panel", DesignSystem.panel_style(
-			Color(0.035, 0.075, 0.13, 0.94), 22, DesignSystem.MINT, 2
-		))
-		var wheel_label := DesignSystem.label("◀  STEERING WHEEL  ▶\nDRAG TO TURN", 14, DesignSystem.WHITE)
-		wheel_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		wheel_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		wheel_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		wheel.add_child(wheel_label)
-		wheel.gui_input.connect(func(event: InputEvent) -> void: _on_wheel_input(event, wheel))
-		return wheel
-	var buttons := HBoxContainer.new()
-	buttons.add_theme_constant_override("separation", 12)
-	_add_hold_button(buttons, "◀", func(value: bool) -> void: _set_touch_left(value))
-	_add_hold_button(buttons, "▶", func(value: bool) -> void: _set_touch_right(value))
-	return buttons
+	var wheel := MobileSteeringWheelType.new()
+	wheel.name = "AnalogSteeringWheel"
+	wheel.configure(settings.touch_control_size, settings.touch_control_opacity)
+	wheel.steering_changed.connect(func(value: float) -> void:
+		if input_adapter != null:
+			input_adapter.touch_steer = value
+	)
+	return wheel
 
 
 func _pedal_controls() -> Control:
@@ -458,43 +444,6 @@ func _compact_panel_style(
 	style.shadow_size = 5
 	style.shadow_offset = Vector2(0.0, 3.0)
 	return style
-
-
-func _set_touch_left(value: bool) -> void:
-	_touch_left_held = value
-	input_adapter.touch_steer = float(int(_touch_right_held) - int(_touch_left_held))
-
-
-func _set_touch_right(value: bool) -> void:
-	_touch_right_held = value
-	input_adapter.touch_steer = float(int(_touch_right_held) - int(_touch_left_held))
-
-
-func _on_wheel_input(event: InputEvent, wheel: Control) -> void:
-	if event is InputEventScreenTouch:
-		if event.pressed and (_wheel_touch_index < 0 or _wheel_touch_index == event.index):
-			_wheel_touch_index = event.index
-			_set_wheel_axis(event.position.x, wheel.size.x)
-		elif not event.pressed and event.index == _wheel_touch_index:
-			_wheel_touch_index = -1
-			input_adapter.touch_steer = 0.0
-		wheel.accept_event()
-	elif event is InputEventScreenDrag and event.index == _wheel_touch_index:
-		_set_wheel_axis(event.position.x, wheel.size.x)
-		wheel.accept_event()
-	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		if event.pressed:
-			_set_wheel_axis(event.position.x, wheel.size.x)
-		else:
-			input_adapter.touch_steer = 0.0
-		wheel.accept_event()
-	elif event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
-		_set_wheel_axis(event.position.x, wheel.size.x)
-		wheel.accept_event()
-
-
-func _set_wheel_axis(local_x: float, wheel_width: float) -> void:
-	input_adapter.touch_steer = clampf(local_x / maxf(wheel_width, 1.0) * 2.0 - 1.0, -1.0, 1.0)
 
 
 func _configure_track_from_payload() -> String:
@@ -909,9 +858,6 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _release_controls() -> void:
 	input_adapter.reset_touch()
-	_wheel_touch_index = -1
-	_touch_left_held = false
-	_touch_right_held = false
 
 
 func _toggle_camera(persist: bool = true) -> void:

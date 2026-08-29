@@ -114,10 +114,10 @@ func _run() -> void:
 	test.assert_equal(int(standings_snapshot.get("player_position", 0)), 1, "live standings clearly identify the player's initial grid rank")
 	var gas_button := _find_button(screen, "GAS")
 	var brake_button := _find_button(screen, "BRAKE\nREVERSE")
-	var left_button := _find_button(screen, "◀")
-	var right_button := _find_button(screen, "▶")
+	var steering_wheel := _find_named_control(screen, "AnalogSteeringWheel")
 	test.assert_true(gas_button != null and brake_button != null, "mobile accelerator and conventional brake/reverse pedals are present")
-	test.assert_true(left_button != null and right_button != null, "mobile left/right steering controls are present")
+	test.assert_true(steering_wheel != null, "mobile analog steering wheel replaces discrete arrow controls")
+	test.assert_true(_find_button(screen, "◀") == null and _find_button(screen, "▶") == null, "race HUD contains no legacy left/right arrow buttons")
 	if gas_button != null:
 		gas_button.button_down.emit()
 		test.assert_equal(screen.input_adapter.touch_throttle, 1.0, "holding GAS reaches the sampled touch throttle")
@@ -128,14 +128,11 @@ func _run() -> void:
 		test.assert_equal(screen.input_adapter.touch_brake, 1.0, "holding BRAKE/REVERSE reaches the sampled touch brake")
 		brake_button.button_up.emit()
 		test.assert_equal(screen.input_adapter.touch_brake, 0.0, "releasing BRAKE/REVERSE clears touch brake")
-	if left_button != null and right_button != null:
-		left_button.button_down.emit()
-		test.assert_equal(screen.input_adapter.touch_steer, -1.0, "holding left produces full normalized left steering")
-		left_button.button_up.emit()
-		right_button.button_down.emit()
-		test.assert_equal(screen.input_adapter.touch_steer, 1.0, "holding right produces full normalized right steering")
-		right_button.button_up.emit()
-		test.assert_equal(screen.input_adapter.touch_steer, 0.0, "releasing steering returns the touch axis to center")
+	if steering_wheel != null:
+		steering_wheel.call("_set_axis_from_local", Vector2(steering_wheel.size.x, steering_wheel.size.y * 0.5))
+		test.assert_equal(screen.input_adapter.touch_steer, 1.0, "wheel drag produces a continuous normalized steering axis")
+		steering_wheel.call("_release_steering")
+		test.assert_equal(screen.input_adapter.touch_steer, 0.0, "wheel release centers authoritative steering")
 	if screen.director != null:
 		test.assert_equal(screen.director.entries.size(), 6, "configured grid launches one player and five AI")
 		test.assert_equal(screen.director.total_laps, 5, "RaceDirector and lap trackers use the selected five laps")
@@ -288,6 +285,16 @@ func _find_button(node: Node, exact_text: String) -> Button:
 		return node
 	for child in node.get_children():
 		var match := _find_button(child, exact_text)
+		if match != null:
+			return match
+	return null
+
+
+func _find_named_control(node: Node, exact_name: String) -> Control:
+	if node is Control and node.name == exact_name:
+		return node
+	for child in node.get_children():
+		var match := _find_named_control(child, exact_name)
 		if match != null:
 			return match
 	return null

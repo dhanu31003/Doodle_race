@@ -77,3 +77,15 @@ func _build_fixture() -> void:
 		int(standings.get("player_position", 0)), int(standings.get("row_count", 0)),
 		int(telemetry.get("node_count", 0)), int(standings.get("node_count", 0)),
 	])
+	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--capture="):
+			var capture_path := ProjectSettings.globalize_path(
+				argument.trim_prefix("--capture=")
+			)
+			var capture_error := root.get_texture().get_image().save_png(capture_path)
+			if capture_error != OK:
+				push_error("HUD_MOBILE_FIXTURE could not save capture: %s" % capture_path)
+				quit(1)
+				return
+			print("HUD_MOBILE_FIXTURE capture=%s" % capture_path)
+	quit(0)

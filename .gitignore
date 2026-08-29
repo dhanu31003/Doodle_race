@@ -10,6 +10,8 @@ mono_crash.*.json
 # Generated application and mobile build outputs
 /android/
 /builds/
+/native/**/.gradle/
+/native/**/build/
 *.apk
 *.aab
 *.idsig

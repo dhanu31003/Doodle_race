@@ -6,6 +6,7 @@ const TrackDefinitionType := preload("res://game/track/definition/track_definiti
 const TrackCompilerType := preload("res://game/track/generation/track_compiler.gd")
 const TrackRendererType := preload("res://game/track/rendering/track_renderer.gd")
 const CatalogType := preload("res://game/content/predefined_track_catalog.gd")
+const TouchOptionType := preload("res://game/ui/components/touch_safe_option_button.gd")
 
 const DEFAULT_LAPS := 3
 const DEFAULT_DIFFICULTY := "standard"
@@ -175,7 +176,7 @@ func _build_options_card() -> PanelContainer:
 	panel.add_child(content)
 	content.add_child(DesignSystem.label("OFFLINE RACE CONTROL", 15, DesignSystem.MINT))
 	content.add_child(DesignSystem.label("LAP COUNT", 12, DesignSystem.MUTED))
-	var laps := OptionButton.new()
+	var laps := TouchOptionType.new()
 	laps.custom_minimum_size.y = 43.0
 	for value in ALLOWED_LAPS:
 		laps.add_item("%d LAPS" % value, value)
@@ -187,7 +188,7 @@ func _build_options_card() -> PanelContainer:
 	content.add_child(laps)
 
 	content.add_child(DesignSystem.label("AI DIFFICULTY", 12, DesignSystem.MUTED))
-	var difficulty := OptionButton.new()
+	var difficulty := TouchOptionType.new()
 	difficulty.custom_minimum_size.y = 43.0
 	for index in ALLOWED_DIFFICULTIES.size():
 		difficulty.add_item(["RELAXED", "STANDARD", "EXPERT"][index], index)
@@ -199,7 +200,7 @@ func _build_options_card() -> PanelContainer:
 	content.add_child(difficulty)
 
 	content.add_child(DesignSystem.label("STARTING GRID", 12, DesignSystem.MUTED))
-	var grid := OptionButton.new()
+	var grid := TouchOptionType.new()
 	grid.custom_minimum_size.y = 43.0
 	for value in range(MIN_GRID_SIZE, MAX_GRID_SIZE + 1):
 		grid.add_item("%d DRIVERS  •  YOU + %d AI" % [value, value - 1], value)
@@ -237,7 +238,7 @@ func _build_options_card() -> PanelContainer:
 	return panel
 
 
-func _select_id(option: OptionButton, item_id: int) -> void:
+func _select_id(option: TouchSafeOptionButton, item_id: int) -> void:
 	for index in option.item_count:
 		if option.get_item_id(index) == item_id:
 			option.select(index)

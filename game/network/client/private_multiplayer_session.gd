@@ -1,8 +1,8 @@
 class_name PrivateMultiplayerSession
 extends Node
-## Persistent private-room client coordinator. It owns ephemeral transport
-## credentials in memory, translates authoritative room events into a UI-safe
-## snapshot, and locally compiles every received track before the ready gate.
+## Persistent nearby-room coordinator. It owns ephemeral peer credentials in
+## memory, translates host-authoritative room events into a UI-safe snapshot,
+## and locally compiles every received track before the ready gate.
 
 signal session_changed(snapshot: Dictionary)
 signal event_received(event: Dictionary)
@@ -17,7 +17,7 @@ const Protocol := preload("res://game/network/network_protocol.gd")
 const Result := preload("res://game/network/network_result.gd")
 const Endpoint := preload("res://game/network/client/network_endpoint.gd")
 const IdentityStore := preload("res://game/network/client/install_identity_store.gd")
-const NAKAMA_TRANSPORT_PATH := "res://game/network/nakama/nakama_multiplayer_transport.gd"
+const NEARBY_TRANSPORT_PATH := "res://game/network/nearby/nearby_multiplayer_transport.gd"
 const Manifest := preload("res://game/network/network_track_manifest.gd")
 const Compiler := preload("res://game/track/generation/track_compiler.gd")
 const TrackDefinitionType := preload("res://game/track/definition/track_definition.gd")
@@ -85,13 +85,12 @@ func connect_async(requested_name: String, requested_endpoint: Dictionary = {}) 
 	connection_state = CONNECTION_CONNECTING
 	_emit_changed()
 	_close_transport()
-	# Keep the comparatively large SDK graph cold for offline players and editor
-	# smoke tests. Loading it only on an explicit Create/Join action also avoids
-	# SDK resource-cache teardown noise in offline-only runs.
-	var nakama_transport_script: Script = load(NAKAMA_TRANSPORT_PATH)
-	if nakama_transport_script == null:
-		return _fail_connection({"code": "transport_unavailable", "message": "Private-room transport could not be loaded."})
-	transport = nakama_transport_script.new()
+	# Keep the Android-specific bridge cold for offline players and editor smoke
+	# tests. It is loaded only after an explicit Create/Join action.
+	var nearby_transport_script: Script = load(NEARBY_TRANSPORT_PATH)
+	if nearby_transport_script == null:
+		return _fail_connection({"code": "transport_unavailable", "message": "Nearby-room transport could not be loaded."})
+	transport = nearby_transport_script.new()
 	var identity_result := IdentityStore.new().load_or_create()
 	if not identity_result.get("ok", false):
 		return _fail_connection(identity_result.get("error", {}))
@@ -165,8 +164,8 @@ func select_track_async(definition: TrackDefinition) -> Dictionary:
 	var submitted: Dictionary = await transport.submit_track_manifest(room_code, manifest)
 	if not submitted.get("ok", false):
 		return _emit_failure(submitted)
-	# In-memory authority queues the broadcast synchronously; real Nakama will
-	# report on the following process frames. Both paths use the same verifier.
+	# Test authority queues synchronously; a real Nearby radio may deliver on a
+	# following process frame. Both paths use the same deterministic verifier.
 	poll_events()
 	return Result.success({"source_hash": manifest["source_hash"], "compiled_fingerprint": manifest["compiled_fingerprint"]})
 
@@ -411,7 +410,11 @@ func public_snapshot() -> Dictionary:
 		"countdown": countdown_value.duplicate(true) if countdown_value is Dictionary else {},
 		"close_reason": str(_room.get("close_reason", "")),
 		"has_local_track": _current_definition != null and _current_compiled != null,
-		"endpoint_label": "%s://%s:%d" % [endpoint.get("scheme", "http"), endpoint.get("host", ""), int(endpoint.get("port", 0))],
+		"endpoint_label": str(transport.call("transport_label")) \
+			if transport != null and transport.has_method("transport_label") \
+			else "NEARBY • NO INTERNET",
+		"authority_mode": str(transport.call("authority_mode")) \
+			if transport != null and transport.has_method("authority_mode") else "cloud",
 		"reconnect_remaining_ms": reconnect_remaining_ms(),
 	}
 
@@ -438,6 +441,8 @@ func race_payload() -> Dictionary:
 		"countdown": countdown_value.duplicate(true) if countdown_value is Dictionary else {},
 		"laps": int(race_config["laps"]),
 		"collisions": bool(race_config["collisions"]),
+		"authority_mode": str(transport.call("authority_mode")) \
+			if transport != null and transport.has_method("authority_mode") else "cloud",
 	}
 
 
@@ -550,7 +555,10 @@ static func validate_race_config(laps: Variant, collisions: Variant) -> Dictiona
 
 
 static func is_transport_loss_error(code: String) -> bool:
-	return code in ["nakama_socket_error", "nakama_socket_closed", "nakama_connection_error"]
+	return code in [
+		"nakama_socket_error", "nakama_socket_closed", "nakama_connection_error",
+		"nearby_connection_lost", "nearby_send_failed",
+	]
 
 
 func _apply_join_result(value: Dictionary) -> void:
@@ -739,10 +747,20 @@ func _fail_connection(error_value: Dictionary) -> Dictionary:
 
 func _friendly_error(code: String, fallback: String = "") -> String:
 	match code:
+		"nearby_android_required":
+			return "Nearby multiplayer is available in the Android phone and tablet build."
+		"nearby_play_services_unavailable":
+			return "Google Play services with Nearby Connections is unavailable on this device."
+		"nearby_permissions_denied", "nearby_permission_timeout":
+			return "Allow Nearby devices, Bluetooth, and local discovery permissions to race friends close by."
+		"nearby_room_not_found":
+			return "No nearby RaceGlyph room has that code. Keep both devices awake, close together, and try again."
+		"nearby_connection_timeout", "nearby_connection_refused":
+			return "The nearby host could not complete the connection. Move both devices closer and retry."
 		"nakama_device_auth_failed", "nakama_socket_connect_failed", "nakama_rpc_failed", "transport_unavailable":
-			return "The private-room backend is unavailable. Offline Race is still ready to play."
-		"nakama_socket_error", "nakama_socket_closed", "nakama_connection_error":
-			return "Connection interrupted. Racing is paused while the 20-second reconnect window remains open."
+			return "Nearby multiplayer is unavailable. Offline Race is still ready to play."
+		"nakama_socket_error", "nakama_socket_closed", "nakama_connection_error", "nearby_connection_lost":
+			return "Nearby connection interrupted. Keep both devices awake and close together, then retry."
 		"room_not_found":
 			return "That private room was not found. Check the six-character code and try again."
 		"room_full":
@@ -760,9 +778,9 @@ func _friendly_error(code: String, fallback: String = "") -> String:
 		"update_required":
 			return "UPDATE REQUIRED • This build is incompatible with the private-room service. Update RaceGlyph before joining."
 		"rematch_unavailable":
-			return "Rematch becomes available after the cloud authority finalizes the race results."
+			return "Rematch becomes available after the host phone finalizes the race results."
 		"reconnect_expired", "resume_membership_missing", "nakama_resume_timeout":
-			return "The 20-second reconnect window expired. Return to Private Room to join again."
+			return "The nearby connection expired. Return to Nearby Race to join again."
 		"track_identity_mismatch":
 			return "Your locally generated circuit did not match the host. Ready is blocked for fairness."
 		"input_boost_disabled":

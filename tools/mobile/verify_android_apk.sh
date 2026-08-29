@@ -8,13 +8,12 @@ fi
 
 apk_path="${1:-builds/android/RaceGlyph-candidate.apk}"
 expected_package="com.raceglyph.game"
-expected_version_code="4"
-expected_version_name="0.4.0"
+expected_version_code="6"
+expected_version_name="0.6.0"
 expected_min_sdk="24"
 expected_target_sdk="36"
 expected_native_code="'arm64-v8a'"
 expected_label="RaceGlyph"
-expected_adaptive_icon="res/mipmap-anydpi-v26/icon.xml"
 
 if [[ ! -f "${apk_path}" ]]; then
   echo "Android APK not found: ${apk_path}" >&2
@@ -44,6 +43,7 @@ done
 
 aapt_path=""
 apksigner_path=""
+apkanalyzer_path=""
 build_tools_dir=""
 
 for sdk_root in "${sdk_roots[@]}"; do
@@ -69,6 +69,10 @@ for sdk_root in "${sdk_roots[@]}"; do
     # for the same build-tools generation and still produces stable badging.
     aapt_path="${best_dir}/aapt2"
     apksigner_path="${best_dir}/apksigner"
+    sdk_root="${best_dir%/build-tools/*}"
+    if [[ -x "${sdk_root}/cmdline-tools/latest/bin/apkanalyzer" ]]; then
+      apkanalyzer_path="${sdk_root}/cmdline-tools/latest/bin/apkanalyzer"
+    fi
     break
   fi
 done
@@ -127,7 +131,19 @@ permissions="$(printf '%s\n' "${badging}" \
   | sed -n "s/^uses-permission: name='\([^']*\)'.*/\1/p" \
   | LC_ALL=C sort -u)"
 expected_permissions="$(printf '%s\n' \
+  android.permission.ACCESS_COARSE_LOCATION \
+  android.permission.ACCESS_FINE_LOCATION \
+  android.permission.ACCESS_LOCAL_NETWORK \
+  android.permission.ACCESS_NETWORK_STATE \
+  android.permission.ACCESS_WIFI_STATE \
+  android.permission.BLUETOOTH \
+  android.permission.BLUETOOTH_ADMIN \
+  android.permission.BLUETOOTH_ADVERTISE \
+  android.permission.BLUETOOTH_CONNECT \
+  android.permission.BLUETOOTH_SCAN \
+  android.permission.CHANGE_WIFI_STATE \
   android.permission.INTERNET \
+  android.permission.NEARBY_WIFI_DEVICES \
   android.permission.VIBRATE \
   | LC_ALL=C sort)"
 
@@ -138,10 +154,21 @@ check_equal "minimum SDK" "${expected_min_sdk}" "${min_sdk}"
 check_equal "target SDK" "${expected_target_sdk}" "${target_sdk}"
 check_equal "native architectures" "${expected_native_code}" "${native_code}"
 check_equal "application label" "${expected_label}" "${application_label}"
-check_equal "adaptive launcher icon" "${expected_adaptive_icon}" "${application_icon}"
+if [[ -z "${application_icon}" || "${application_icon}" != res/*.xml ]] \
+    || ! unzip -Z1 "${apk_path}" | grep -Fxq "${application_icon}"; then
+  fail_check "adaptive launcher icon resource is missing from the release APK"
+fi
 check_equal "requested permissions" "${expected_permissions}" "${permissions}"
 if ! printf '%s\n' "${badging}" | grep -Fxq 'application-isGame'; then
   fail_check "Android application is not marked as a game"
+fi
+nearby_packages=""
+if [[ -z "${apkanalyzer_path}" ]]; then
+  fail_check "apkanalyzer is unavailable for Nearby plugin inspection"
+elif ! nearby_packages="$("${apkanalyzer_path}" dex packages "${apk_path}" 2>&1)"; then
+  fail_check "apkanalyzer could not inspect Nearby plugin classes"
+elif ! grep -Fq 'com.raceglyph.nearby.RaceGlyphNearbyPlugin' <<<"${nearby_packages}"; then
+  fail_check "RaceGlyph Nearby Android plugin class is missing"
 fi
 
 signature_output=""
@@ -172,5 +199,5 @@ echo "PASS Android APK: ${apk_path}"
 echo "  package=${package_name} versionCode=${version_code} versionName=${version_name}"
 echo "  label=${application_label} game=true icon=${application_icon} build=${build_kind}"
 echo "  minSdk=${min_sdk} targetSdk=${target_sdk} native=${native_code}"
-echo "  permissions=INTERNET,VIBRATE signers=${signer_count}"
+echo "  permissions=Nearby-scoped,INTERNET,VIBRATE signers=${signer_count}"
 echo "  build-tools=${build_tools_dir}"

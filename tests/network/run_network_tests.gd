@@ -7,6 +7,7 @@ const SUITES: Array[Script] = [
 	preload("res://tests/network/test_client_sync.gd"),
 	preload("res://tests/network/test_fake_room_server.gd"),
 	preload("res://tests/network/test_network_race_runtime.gd"),
+	preload("res://tests/network/test_nearby_multiplayer_transport.gd"),
 ]
 
 
@@ -15,7 +16,7 @@ func _initialize() -> void:
 	var assertion_count := 0
 	for suite_script in SUITES:
 		var suite: RefCounted = suite_script.new()
-		var suite_result: Dictionary = suite.run()
+		var suite_result: Dictionary = await suite.run()
 		assertion_count += int(suite_result.get("assertions", 0))
 		if int(suite_result.get("assertions", 0)) == 0:
 			failed_suites += 1

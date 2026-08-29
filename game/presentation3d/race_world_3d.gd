@@ -29,6 +29,7 @@ const VEHICLE_RIDE_HEIGHT_METERS := 0.075
 const VEHICLE_GRADE_PROBE_AUTHORITY_UNITS := 9.0
 const MAX_GROUNDED_PITCH_RADIANS := deg_to_rad(28.0)
 const MAX_AIRBORNE_PITCH_RADIANS := deg_to_rad(10.0)
+const MOBILE_REMOTE_ANIMATION_STRIDE := 3
 
 const AI_COLORS := [
 	Color("ff5364"), Color("40bff5"), Color("ffc342"), Color("9b7cff"),
@@ -333,7 +334,8 @@ func debug_snapshot() -> Dictionary:
 		),
 		"mobile_device_profile": _is_mobile_runtime(),
 		"mobile_render_budget": _uses_mobile_render_budget(),
-		"mobile_remote_animation_stride": 2 if _uses_mobile_render_budget() else 1,
+		"mobile_remote_animation_stride": MOBILE_REMOTE_ANIMATION_STRIDE \
+				if _uses_mobile_render_budget() else 1,
 		"remote_animation_update_count": _remote_animation_update_count,
 		"remote_animation_skip_count": _remote_animation_skip_count,
 		"vehicle_render_budget_apply_count": _vehicle_render_budget_apply_count,
@@ -374,6 +376,7 @@ func debug_snapshot() -> Dictionary:
 			if _world_environment.environment != null else 0.0
 		),
 		"sun_light_energy": _sun.light_energy,
+		"sun_shadow_enabled": _sun.shadow_enabled,
 		"sun_shadow_max_distance": _sun.directional_shadow_max_distance,
 		"fog_enabled": (
 			_world_environment.environment.fog_enabled
@@ -570,9 +573,12 @@ func _configure_daylight() -> void:
 	# High Contrast is a post-grade accessibility mode; increasing scene light
 	# here previously clipped white barriers and grandstands.
 	_sun.light_energy = 1.02
-	_sun.shadow_enabled = true
-	_sun.directional_shadow_max_distance = (
-		145.0 if _low_graphics else (185.0 if _is_mobile_runtime() else 270.0)
+	# Mobile cars use a single authored contact shadow and every remote shadow is
+	# already disabled. Avoiding a redundant directional shadow atlas removes a
+	# full off-screen geometry pass on phones.
+	_sun.shadow_enabled = not _uses_mobile_render_budget()
+	_sun.directional_shadow_max_distance = shadow_distance_for_profile(
+		_low_graphics, _is_mobile_runtime()
 	)
 	_sun.shadow_blur = 1.35
 
@@ -580,15 +586,31 @@ func _configure_daylight() -> void:
 func _apply_render_quality() -> void:
 	if not _scene_built:
 		return
-	# Low Graphics halves only the 3D SubViewport; HUD/touch controls remain at
-	# native resolution. Normal mobile mode keeps full resolution but trades 2x
-	# MSAA for inexpensive FXAA, avoiding a blanket quality loss on capable phones.
-	_viewport_container.stretch_shrink = 2 if _low_graphics else 1
+	# The HUD stays at native resolution while every phone renders only the 3D
+	# world at half linear resolution. High-density phone panels otherwise ask a
+	# 60 FPS racing scene to shade 2-4x more pixels than its visible detail needs.
+	_viewport_container.stretch_shrink = viewport_shrink_for_profile(
+		_low_graphics, _is_mobile_runtime()
+	)
 	_viewport.msaa_3d = Viewport.MSAA_DISABLED \
 			if _uses_mobile_render_budget() else Viewport.MSAA_2X
 	_viewport.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED \
 			if _low_graphics else Viewport.SCREEN_SPACE_AA_FXAA
 	_viewport.use_taa = false
+
+
+static func viewport_shrink_for_profile(
+		low_graphics: bool, mobile_runtime: bool
+	) -> int:
+	return 2 if low_graphics or mobile_runtime else 1
+
+
+static func shadow_distance_for_profile(
+		low_graphics: bool, mobile_runtime: bool
+	) -> float:
+	if low_graphics:
+		return 72.0
+	return 96.0 if mobile_runtime else 270.0
 
 
 func _sync_viewport_size() -> void:
@@ -789,11 +811,12 @@ func _update_vehicle_presentations() -> void:
 		)
 		# Opponent transforms remain fully interpolated every display frame. Only
 		# presentation-only wheels, suspension, lights and dirt stages are evenly
-		# divided across two mobile phases, preventing a full-pack CPU spike.
+		# divided across three mobile phases, preventing a full-pack CPU spike.
 		var update_animation := true
 		if not is_player and mobile_budget:
 			update_animation = posmod(
-				remote_index + _mobile_remote_animation_phase, 2
+				remote_index + _mobile_remote_animation_phase,
+				MOBILE_REMOTE_ANIMATION_STRIDE
 			) == 0
 			remote_index += 1
 			if update_animation:
@@ -846,7 +869,9 @@ func _update_vehicle_presentations() -> void:
 		_road_surface_effects.update_vehicles(
 			_entries, _vehicles, _player_visual_id
 		)
-	_mobile_remote_animation_phase = (_mobile_remote_animation_phase + 1) % 2 \
+	_mobile_remote_animation_phase = (
+		_mobile_remote_animation_phase + 1
+	) % MOBILE_REMOTE_ANIMATION_STRIDE \
 			if mobile_budget else 0
 
 

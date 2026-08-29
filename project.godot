@@ -6,7 +6,7 @@ config_version=5
 
 config/name="RaceGlyph"
 config/description="Draw a circuit. Shape the race."
-config/version="0.4.0"
+config/version="0.6.0"
 run/main_scene="res://game/ui/main.tscn"
 config/auto_accept_quit=false
 config/icon="res://assets/final/brand/raceglyph_mark.svg"
@@ -32,6 +32,10 @@ window/size/window_height_override=720
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/handheld/orientation=4
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/RaceGlyphNearby/plugin.cfg")
 
 [rendering]
 

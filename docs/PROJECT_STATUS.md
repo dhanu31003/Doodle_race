@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-08-18 (Asia/Kolkata)
+Last updated: 2026-08-30 (Asia/Kolkata)
 
 ## Goal
 
@@ -13,13 +13,16 @@ The earlier local candidate reached the autonomous contract's original stopping 
 
 ## Current phase
 
-**The mobile game baseline remains locally qualified and protocol 4 now provides cloud-owned online race simulation with first-frame client prediction. Public AWS deployment, a fresh one-shot immutable-candidate release gate, and physical-device qualification remain open.**
+**The Android 0.6.0 candidate is release-signed and mobile-first: analog wheel steering replaces arrows, option sheets select only on tap-release, and the dense mobile renderer removes the redundant directional-shadow atlas. Focused tests and artifact audits pass; physical two-device/thermal qualification and Play review remain open.**
 
 This wording is deliberate. “Feature-complete” applies to the implemented v1 game and local backend scope. It does not mean store-ready, physically qualified, signed, publicly hosted, legally cleared, tagged, or reproducible from a clean checkout.
 
 ## Current mobile-quality requalification
 
-- Current source is version `0.4.0`, protocol `4`, track schema `2`, and generator `3`. Protocol 4 replaces client-host racing with Nakama-owned 60 Hz simulation and 20 Hz server snapshots; every phone sends controls, predicts its own response immediately, and reconciles to cloud state. The verified track manifest now carries hashed bounded authority geometry, clients cannot publish snapshots/results, and creator departure transfers administration without stopping the race. The existing smooth, weathered, bumpy, gravel, and mud profiles remain part of the deterministic content baseline.
+- Current source is version `0.6.0`, protocol `4`, track schema `2`, and generator `3`. On Android, the creating phone advertises a six-character room over Google Nearby `P2P_STAR` and owns deterministic 60 Hz race authority; guest phones/tablets apply controls immediately and reconcile to host snapshots. Verified track manifests still gate Ready, no Internet/PC/account is required, and creator departure ends the room. Smooth, weathered, bumpy, gravel, and mud remain part of the deterministic content baseline.
+- The mobile HUD now exposes one drawn analog steering wheel with continuous input and immediate authority centering on release; existing `buttons` saves migrate to wheel steering. Every production option selector uses a 52 px release-action row inside an 18 px touch-scroll deadzone, so scrolling cannot commit an option. The current 26-fixture landscape/notched layout matrix passes at 0.85×–1.30× UI scale.
+- The current dense 12-car Mud chase fixture, with all 11 opponents inside 30 m, records 60.0 average FPS, 16.64 ms average frame time, 17.99 ms p95, 18.09 ms p99, and 19.19 ms maximum on Apple M2. Peak cost is 214 draws, 634 bounded render objects, and 126,542 primitives. This proves the corrected development-host path, not Snapdragon/mid-tier thermal performance.
+- Current Nearby verification: native Java/AAR assembly PASS; 423 deterministic network assertions PASS, including discovery delimiters, exact room-code join, authoritative lobby messages, guest-input consumption, full-grid host snapshots, and host termination; full normal gate `PASS all requested checks`. Evidence: [`../evidence/logs/full-check-20260818T220217Z.log`](../evidence/logs/full-check-20260818T220217Z.log), SHA-256 `a056cf180e7a43ed02849e5b99779547abbf6654db685136a0a66cd22f1dcd2c`.
 - The exact 160 mph crest fixture now launches at 4.600 m/s, remains airborne for 1.683 seconds, reaches 7.033 m maximum road clearance, and lands exactly under standard gravity. Tyre acceleration, braking, steering, and rolling forces do not act while airborne.
 - Full normal gate: `PASS all requested checks`; 4,706 focused assertions plus a six-circuit/72-car finish smoke, 13 clean UI routes, 26 accessibility layouts, and source/editor/audio-playback checks. Evidence: [`../evidence/logs/full-check-20260725T192237Z.log`](../evidence/logs/full-check-20260725T192237Z.log), SHA-256 `fac5a01f2c6db14d9a8c780e9fb735ccf52bb5325ac993615eb1a339f8dcba82`.
 - Fresh visual review proves that bumpy asphalt uses irregular repairs/cracks, body dust and loose chips; gravel uses multiscale aggregate, tan vehicle dust, rounded stones and a dust plume; and Mud reaches 94.1% accumulation with all ten player splatter instances, 0.891 opacity, a strongly browned body/wheel finish, one rear wake, 48 pooled particles, and 20 road details: [current Mud capture](../evidence/screenshots/mud_optimized_20260726.png). Weathered asphalt retains its wet film, light rain and mist.
@@ -51,13 +54,13 @@ This wording is deliberate. “Feature-complete” applies to the implemented v1
 - Deterministic AI personalities/tactics/recovery plus representative 20-lap and frozen generated-corpus soak coverage.
 - Responsive safe-area application shell with 13 routes, accessibility settings/layout fixtures, original identity foundation, eight fictional colorways, credits, and notices.
 - Versioned persistence with atomic writes, backups, corruption recovery, migrations, portable local export, and complete local deletion/session clearing.
-- Private human-only rooms for up to 12 players through pinned Nakama/PostgreSQL: create/join, lock/ready/start, circuit/schema/hash verification, same-room Studio, roster/rules, prediction/relay, reconnect, host transition, results/share/rematch, and offline outage behavior. Mobile pause/focus is single-flight, stale reconnect work is generation-guarded, leave is local-first, system Back leaves authoritatively, ready is phase-gated, control traffic is limited to 12/s, and kick removes plus bans room rejoin.
+- Nearby human-only Android rooms for up to 12 players: create/code-join, lock/ready/start, circuit/schema/hash verification, same-room Studio, roster/rules, first-frame prediction, creator-phone authority, results/share/rematch, and explicit host-departure termination. Mobile pause/focus is single-flight, leave is local-first, Ready is phase-gated, control traffic is bounded, and kick removes plus bans room rejoin.
 - Disposable local backend health/E2E/load and isolated backup/restore drills with retained redacted evidence and teardown audits.
 - Fresh current-source mobile artifacts as far as local tooling allows: statically verified Android APK and unsigned iOS Xcode project. Android shipping Vulkan runtime and iOS build/sign destinations remain externally blocked as detailed below.
 
 Private-room AI fill, ranked/public matchmaking, chat/economy/ads, strong anti-cheat, and public deployment are explicit v1 exclusions, not missing features.
 
-The tested private-room backend remains local evidence, but the mobile production path is implemented in source: Android/iOS default to `https://multiplayer.neutale.com:443`, engineering endpoint controls are hidden, and a pinned Caddy/TLS/Nakama/PostgreSQL stack exposes only public web ingress. Nakama—not the creating phone—owns race snapshots/results. An authorized AWS account, DNS record, production secrets, external smoke, monitoring/backups, and two-phone qualification are still required before internet-connected phones can actually join.
+The cloud backend remains retained, deferred source and historical regression evidence. It is not selected or packaged by the Android 0.6.0 test candidate. Internet-wide multiplayer can be reconsidered after product/ad-revenue evidence; it is not required for this Nearby APK.
 
 ## Superseded frozen verification baseline
 

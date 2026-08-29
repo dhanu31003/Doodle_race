@@ -34,12 +34,48 @@ func run() -> Dictionary:
 	test.assert_equal(NetworkRaceScreenType.history_persistence_failure_text({"ok": true}), "", "successful results persistence emits no false warning")
 	_test_formula_dynamics_snapshot_round_trip(test)
 	_test_cloud_authority_path_elevation(test)
+	_test_peer_host_authority_consumes_guest_input(test)
 	_test_contact_event_survives_guest_paths(test)
 	_test_two_client_authority_prediction_and_leave(test)
 	_test_bridge_snapshot_reconciliation(test)
 	_test_recovery_parity_forces_two_hard_snaps(test)
 	_test_deterministic_loss_jitter_and_reordering(test)
 	return test.result("network_race_runtime")
+
+
+func _test_peer_host_authority_consumes_guest_input(test: RefCounted) -> void:
+	var item := CatalogType.all()[0]
+	var compiled: TrackCompileResult = CompilerType.compile(item["definition"])
+	var roster := [
+		{"player_id": "nearby-host", "display_name": "Host", "slot": 0},
+		{"player_id": "nearby-guest", "display_name": "Guest", "slot": 1},
+	]
+	var runtime := RuntimeType.new()
+	test.assert_true(runtime.configure(
+		compiled.track, roster, "nearby-host", "nearby-host", "NEAR01", 1, 10,
+		null, 3, true, "peer_host"
+	)["ok"], "nearby creator configures as peer-host race authority")
+	test.assert_true(runtime.begin(10), "nearby creator starts deterministic phone authority")
+	var snapshots: Array[Dictionary] = []
+	runtime.outbound_envelope.connect(func(envelope: Dictionary) -> void:
+		if int(envelope.get("opcode", -1)) == ProtocolType.OP_STATE_SNAPSHOT:
+			snapshots.append(envelope.duplicate(true))
+	)
+	var guest_command := RaceInputType.new(0.2, 1.0, 0.0)
+	var guest_input := ProtocolType.make_envelope(
+		ProtocolType.OP_INPUT_FRAME,
+		"nearby-guest",
+		1,
+		1,
+		CodecType.input_payload(guest_command, 10),
+		10
+	)
+	test.assert_true(runtime.handle_event(guest_input)["ok"], "nearby host accepts a bounded guest input envelope")
+	test.assert_equal(runtime.advance_frame(6.0 / 60.0, RaceInputType.new(0.0, 1.0, 0.0)), 6, "nearby phone host advances exact fixed simulation ticks")
+	test.assert_true(runtime.remote_input_active("nearby-guest"), "nearby host applies the fresh guest input instead of zeroing it")
+	test.assert_true(runtime.director.entry(&"nearby-guest").state.speed() > 0.0, "nearby guest vehicle accelerates inside phone authority")
+	test.assert_true(snapshots.size() >= 2, "nearby phone host publishes bounded full-grid snapshots")
+	test.assert_equal(str(snapshots[0].get("sender_id", "")), "nearby-host", "nearby snapshot sender is the creating phone")
 
 
 func _test_cloud_authority_path_elevation(test: RefCounted) -> void:

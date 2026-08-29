@@ -37,7 +37,7 @@ Every `[x]` below applies only to frozen gate `20260723T214917Z`, base commit `1
 ## Quality evidence
 
 - [ ] Clean immutable checkout/tag reproducibly builds the exact artifacts and reruns every gate.
-- [x] Deterministic track/rendering fixtures, all 13 routes, and 15 accessibility layouts pass headless development-host coverage.
+- [x] Deterministic track/rendering fixtures, all 13 routes, and 26 accessibility layouts pass development-host coverage.
 - [ ] Frozen candidate-wide pixel-diff/human visual review passes at required phone/tablet sizes.
 - [x] Twelve-car AI, dense track-feature/forest, and bridge authority/rendering cases pass automated development-host gates.
 - [ ] Thirty-minute physical thermal/battery and frozen mobile FPS/memory budgets pass.
@@ -60,10 +60,11 @@ Every `[x]` below applies only to frozen gate `20260723T214917Z`, base commit `1
 ## Android artifact
 
 - [x] Godot 4.7.1 templates and Java 17/API 36/Build-Tools 36.0.0/NDK configuration are recorded.
-- [x] Debug APK `590b75e…3c42` passes package/version, landscape project settings, ARM64, icon, min/target SDK, exact `INTERNET` + `VIBRATE`, and signature audit.
-- [x] That APK installs, warm-launches, and renders the menu on the API 36 emulator without a critical app-runtime pattern.
+- [x] Release APK `6036715…c2f00` passes package/version, game flag, ARM64, adaptive-icon resource, min/target SDK, Nearby-scoped permissions, plugin presence, and modern signature audit.
+- [x] Release AAB `26f1ee4…4563` passes ZIP and JAR signature verification with the protected dedicated Neutale upload key; its password is not stored in the repository.
+- [ ] The exact 0.6.0 release APK installs, warm-launches, and completes a race on a physical Android device.
 - [ ] Touch/controller/vibration/background-resume and performance/thermal pass required physical Android devices.
-- [ ] Release AAB uses a protected owner-controlled keystore, non-debug signing/configuration, and final owner-approved identity; the retained debug AAB is not a store artifact.
+- [ ] Final `RaceGlyph` / `com.raceglyph.game` identity receives explicit owner/legal clearance before an irreversible Play listing is created or submitted.
 - [ ] Play internal/pre-launch results and current target-API/store policy are reviewed at submission time.
 
 ## iOS artifact

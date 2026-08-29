@@ -11,7 +11,7 @@ RaceGlyph (provisional name; no legal clearance) turns a single hand-drawn loop 
 - Players who want approachable mobile racing and creative track making.
 - Landscape phones and tablets on Android and iOS.
 - Typical loop: draw or choose track → validate/generate → tour → configure race → race → results → retry/edit/share.
-- Offline is the default dependable mode; a backend outage must not block local play.
+- Offline is the default dependable mode. Nearby Android multiplayer does not require an Internet backend.
 
 ## Non-negotiable experience
 
@@ -51,9 +51,9 @@ RaceGlyph (provisional name; no legal clearance) turns a single hand-drawn loop 
 - Host configures laps/collisions, kicks, and explicitly locks or unlocks the grid before countdown. Locking closes invites and freezes circuit/rule/kick changes, while verified members may still acknowledge Ready; start requires a locked, fully ready grid.
 - Every member selects an original fictional team/car. The authoritative roster carries those selections into the lobby and race presentation.
 - Admission requires an exact app-build/protocol/schema/generator/platform tuple. Track readiness separately requires the same canonical definition hash and successful local generation; incompatibility opens a blocking update-required surface while offline play remains available.
-- The race HUD includes sector timing; client-predicted sector data is labeled `LOCAL` and is never presented as cloud-authoritative.
-- Cloud-authored results can be copied without room codes or internal peer identifiers. Guests may request a rematch; only the current room administrator can reset the same verified room, preserving the grid lock while clearing Ready acknowledgements.
-- Cloud-authoritative private-room model with first-frame local prediction; no ranked mode or complete commercial anti-cheat claim in v1.
+- The race HUD includes sector timing; client-predicted sector data is labeled `LOCAL` and is never presented as host-authoritative.
+- Host-authored results can be copied without room codes or internal peer identifiers. Guests may request a rematch; only the host phone can reset the same verified room, preserving the grid lock while clearing Ready acknowledgements.
+- Google Nearby Connections `P2P_STAR` model: the creating Android phone owns lobby and 60 Hz race authority, guests apply inputs immediately and reconcile to host snapshots, and the room ends if that phone leaves. This casual nearby mode is not ranked and does not claim commercial anti-cheat.
 
 ## Screens
 

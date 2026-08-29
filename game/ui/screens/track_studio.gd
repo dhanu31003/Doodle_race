@@ -11,6 +11,7 @@ const BridgeDefinitionType := preload("res://game/track/definition/bridge_crossi
 const WorldPlannerType := preload("res://game/track/features/track_world_feature_planner.gd")
 const RaceTrackQueryType := preload("res://game/race/track_query.gd")
 const RoadSurfaceCatalogType := preload("res://game/content/road_surface_catalog.gd")
+const TouchOptionType := preload("res://game/ui/components/touch_safe_option_button.gd")
 const AUTHORING_HELP_TEXT := "Draw one closed loop in any corner style. Extreme points are rounded automatically with only a small correction before the circuit builds."
 # Persistence and compiler authority must never depend on the physical size of
 # the phone or desktop canvas that happened to capture the normalized stroke.
@@ -26,12 +27,12 @@ var confirm_button: Button
 var payload: Dictionary = {}
 var editing_definition: TrackDefinition
 var name_field: LineEdit
-var length_option: OptionButton
-var width_option: OptionButton
-var surface_option: OptionButton
+var length_option: TouchSafeOptionButton
+var width_option: TouchSafeOptionButton
+var surface_option: TouchSafeOptionButton
 var surface_description: Label
-var direction_option: OptionButton
-var pit_option: OptionButton
+var direction_option: TouchSafeOptionButton
+var pit_option: TouchSafeOptionButton
 var density_slider: HSlider
 var density_label: Label
 var bridge_toggle: CheckButton
@@ -93,7 +94,7 @@ func _build() -> void:
 	top.add_theme_constant_override("separation", 14)
 	root.add_child(top)
 	var room_return := bool(payload.get("multiplayer_return", false))
-	var back := DesignSystem.screen_button("‹ PRIVATE ROOM" if room_return else "‹ PADDOCK")
+	var back := DesignSystem.screen_button("‹ NEARBY ROOM" if room_return else "‹ PADDOCK")
 	back.pressed.connect(_return_without_building)
 	top.add_child(back)
 	var heading := DesignSystem.title("TRACK STUDIO", 38)
@@ -287,13 +288,13 @@ func _build() -> void:
 	# never becomes a permanent offset outside a landscape phone viewport.
 	safe.call_deferred("set_anchors_and_offsets_preset", Control.PRESET_FULL_RECT)
 
-func _option_row(parent: VBoxContainer, title: String, choices: Array[String], selected: int) -> OptionButton:
+func _option_row(parent: VBoxContainer, title: String, choices: Array[String], selected: int) -> TouchSafeOptionButton:
 	var row := HBoxContainer.new()
 	row.add_child(DesignSystem.label(title, 14, DesignSystem.MUTED))
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(spacer)
-	var option := OptionButton.new()
+	var option := TouchOptionType.new()
 	option.custom_minimum_size = Vector2(150.0, 48.0)
 	for choice in choices:
 		option.add_item(choice)

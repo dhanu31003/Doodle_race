@@ -2,7 +2,7 @@
 
 RaceGlyph is the provisional working name for an original landscape draw-to-race game for Android and iOS. A player sketches a closed loop, the game validates and compiles it into a deterministic circuit, and a configurable 2–12-driver field races it from a switchable cockpit or elevated chase view. Circuit authoring, tours, and the minimap may use plan view; active driving does not.
 
-> **Candidate state (2026-07-24):** the game and local multiplayer/backend candidate are feature-complete against the implemented v1 scope, and the frozen automated release gate passes. This is **not a store-ready release**: the working tree is dirty/untracked, physical-device and 30-minute thermal qualification are not available, Android release signing is owner-blocked, iOS build/sign/archive is platform- and owner-blocked, and identity/legal/store/public-service approvals remain open. See [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md), [`docs/TEST_REPORT.md`](docs/TEST_REPORT.md), and [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md).
+> **Android release candidate (2026-08-30):** RaceGlyph `0.6.0` adds an analog mobile steering wheel, release-only scrollable option sheets, a bounded mobile shadow/contact-shadow path, and three-phase opponent cosmetic updates on top of Google Nearby multiplayer. Focused gameplay/UI/network/3D tests and the signed APK/AAB audits pass. Physical phone/tablet pairing, thermal profiling, identity/legal review, and Play review remain open. See [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md), [`docs/TEST_REPORT.md`](docs/TEST_REPORT.md), and [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md).
 
 The name **RaceGlyph has not received trademark, store-name, domain, or other legal clearance**. It must not be used publicly until the owner approves a cleared final identity.
 
@@ -10,12 +10,12 @@ The name **RaceGlyph has not received trademark, store-name, domain, or other le
 
 - Track Studio: draw, closure guidance, undo/redo/clear, deterministic validation, very-local extreme-corner rounding, automatic safe grid/bridge placement, direct generation/tour, a separate World & Road section, save/reload/edit/export/delete, and same-room multiplayer authoring.
 - Deterministic circuits: canonical versioned JSON, content hashes, road/curbs/runoff/barriers, pits, grid, checkpoints, lanes, minimap, bridges, recovery data, seeded forest decoration, and five selectable road surfaces with distinct road texture, vehicle coating, moving effects, and authoritative handling.
-- Offline racing: one player plus 1–11 AI opponents, conventional steering/accelerator/brake-reverse controls, assists, collisions, recovery, bounded gravity-driven crest airtime, smoothly grade-following cockpit/chase views, HUD/pause, a live post-finish full-field classification with exact times, effects, and category audio.
+- Offline racing: one player plus 1–11 AI opponents, analog wheel/tilt steering, accelerator and brake-reverse pedals, assists, collisions, recovery, bounded gravity-driven crest airtime, smoothly grade-following cockpit/chase views, HUD/pause, a live post-finish full-field classification with exact times, effects, and category audio.
 - Content and presentation: six predefined circuits, eight original fictional car colorways, a complete forest theme, responsive safe-area UI, accessibility controls, credits, and licenses.
-- Private multiplayer: up to 12 humans through pinned Nakama/PostgreSQL, anonymous sessions, create/code-join, cloud-owned 60 Hz race authority, first-frame local prediction, server reconciliation, explicit lock/readiness, custom-track hash verification, reconnect, creator handover, server results/share/rematch, and offline fallback. No player's phone or PC hosts the race. Private-room AI fill is intentionally deferred from v1.
+- Nearby multiplayer: up to 12 Android devices through Google Nearby Connections `P2P_STAR`, anonymous local identity, create/code-join, creator-phone 60 Hz race authority, first-frame guest prediction, host reconciliation, explicit lock/readiness, custom-track hash verification, results/share/rematch, and no Internet or PC requirement. The room ends if the creating phone leaves. Private-room AI fill is deferred.
 - Local data controls: atomic versioned persistence, corruption fallback/migrations, portable local export, and Delete All Local Data with runtime token/session clearing.
 
-## Frozen verification record
+## Current verification record
 
 The authoritative command is:
 
@@ -23,21 +23,20 @@ The authoritative command is:
 tools/qa/run_all_checks.sh --release
 ```
 
-The frozen run at `20260723T214917Z` exited `0` after 817 seconds and ended with `PASS all requested checks`. Its complete log is [`evidence/logs/full-check-20260723T214917Z.log`](evidence/logs/full-check-20260723T214917Z.log), SHA-256 `7be77897455026022b9554a20022fc37c7fc1bfd3fefafb1c881113e709215fc`. A strict whole-log audit found zero `FAIL`, `WARNING`, `ERROR`, parse/compile faults, ObjectDB leaks, or resource leaks.
+The normal run at `20260818T220217Z` exited `0` and ended with `PASS all requested checks`. Its complete log is [`evidence/logs/full-check-20260818T220217Z.log`](evidence/logs/full-check-20260818T220217Z.log), SHA-256 `a056cf180e7a43ed02849e5b99779547abbf6654db685136a0a66cd22f1dcd2c`.
 
-That gate covers asset/source/privacy contracts, editor parse, 2,158 focused game/network assertions, audio playback, 13 UI routes, 15 accessibility fixtures, a deterministic 12-car AI soak, real local Nakama E2E/load, and isolated PostgreSQL backup/restore. Exact suite counts, hashes, limitations, and the closed pre-freeze leak regression are in [`docs/TEST_REPORT.md`](docs/TEST_REPORT.md).
+That gate covers asset/source/privacy contracts, editor parse, track/render/physics/persistence/audio/gameplay suites, 423 network assertions (including a deterministic two-device Nearby bridge and peer-host race authority), 13 UI routes, 26 accessibility fixtures, and a deterministic six-circuit 12-car finish smoke. Exact limitations and historical cloud evidence are in [`docs/TEST_REPORT.md`](docs/TEST_REPORT.md).
 
 ## Mobile artifacts
 
-### Android development candidate
+### Android 0.6.0 signed candidate
 
-- APK: [`builds/android/RaceGlyph-final.apk`](builds/android/RaceGlyph-final.apk)
-- SHA-256: `590b75e0369a6f7d9c42122d58d88cb213459e5a254a8d13d7f42fc943f63c42`
-- Audit: [`evidence/logs/android-apk-final-20260723T213702Z.log`](evidence/logs/android-apk-final-20260723T213702Z.log)
-- API 36 emulator runtime: [`evidence/logs/android-runtime-final-20260723T214441Z.log`](evidence/logs/android-runtime-final-20260723T214441Z.log)
-- Warm-launch capture: [`evidence/screenshots/actual/raceglyph_android_final_warm2.png`](evidence/screenshots/actual/raceglyph_android_final_warm2.png)
+- APK: [`builds/android/RaceGlyph-0.6.0-release.apk`](builds/android/RaceGlyph-0.6.0-release.apk)
+- APK SHA-256: `6036715fe32994ca2776a41e934e19b4bbc8a0dda1183b2657c00cd31c5c2f00`
+- AAB: [`builds/android/RaceGlyph-0.6.0-release.aab`](builds/android/RaceGlyph-0.6.0-release.aab)
+- AAB SHA-256: `26f1ee4d753277d0596ea6517953311d36ef87508bffb34e1d6a89df225f4563`
 
-The debug-signed APK is `com.raceglyph.game` version `0.1.0` (`1`), minimum API 24, target API 36, ARM64-only, and requests exactly `INTERNET` and `VIBRATE`. It installed, warm-launched, and rendered the menu on the API 36 emulator with no critical app-runtime pattern. An unsigned Gradle AAB payload (`jar is unsigned`) exists at [`builds/android/RaceGlyph-final-debug.aab`](builds/android/RaceGlyph-final-debug.aab), SHA-256 `bc2b5be4be7e89b77c1895b1c9f08619175e5021a931aaeddf5ca1f0a068940e`; it is not a store artifact.
+The release-signed artifacts are `com.raceglyph.game` version `0.6.0` (`6`), minimum API 24, target API 36, and ARM64-only. Static audit confirms one Neutale upload signer, the native `RaceGlyphNearbyPlugin`, Google Nearby runtime, and Android-version-scoped Bluetooth, Wi-Fi, location, Nearby devices, and local-network permissions. They are upload-capable candidates, but Play acceptance and physical-device qualification are not yet claimed.
 
 ### iOS project candidate
 
@@ -52,9 +51,8 @@ The unsigned project audit verifies `com.raceglyph.game`, `0.1.0` (`1`), iOS 15.
 
 - Godot `4.7.1.stable.official.a13da4feb`
 - GDScript with deterministic 2D race authority mapped into a true world-space 3D race renderer
-- Nakama `3.40.0` image pinned by digest
-- Official Nakama Godot SDK `3.4.0` pinned to commit `14b7f7078a9822c15b0424624e4c883c87730cee`
-- PostgreSQL `17.9-alpine3.23` image pinned by digest
+- Google Play services Nearby `19.4.0` through a Godot Android v2 plugin
+- Retained, non-shipping Nakama/PostgreSQL cloud prototype for possible later work
 - Versioned canonical JSON `TrackDefinition` with SHA-256 source and compiled fingerprints
 
 See [`docs/adr/0001-engine-and-language.md`](docs/adr/0001-engine-and-language.md) and [`docs/adr/0002-multiplayer-architecture.md`](docs/adr/0002-multiplayer-architecture.md) for the decisions and trade-offs.

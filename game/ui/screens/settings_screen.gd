@@ -2,6 +2,8 @@ extends Control
 
 signal navigate_requested(route: String, payload: Dictionary)
 
+const TouchOptionType := preload("res://game/ui/components/touch_safe_option_button.gd")
+
 var _settings: GameSettings
 var _status: Label
 var _confirm_button: Button
@@ -67,14 +69,14 @@ func _build() -> void:
 	var scheme_spacer := Control.new()
 	scheme_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scheme_row.add_child(scheme_spacer)
-	var schemes := OptionButton.new()
+	var schemes := TouchOptionType.new()
 	schemes.custom_minimum_size = Vector2(180.0, 44.0)
-	for text in ["BUTTONS", "WHEEL", "TILT"]:
+	for text in ["WHEEL", "TILT"]:
 		schemes.add_item(text)
-	var selected := [GameSettings.CONTROL_BUTTONS, GameSettings.CONTROL_WHEEL, GameSettings.CONTROL_TILT].find(_settings.touch_control_scheme)
+	var selected := [GameSettings.CONTROL_WHEEL, GameSettings.CONTROL_TILT].find(_settings.touch_control_scheme)
 	schemes.select(maxi(selected, 0))
 	schemes.item_selected.connect(func(index: int) -> void:
-		_settings.touch_control_scheme = [GameSettings.CONTROL_BUTTONS, GameSettings.CONTROL_WHEEL, GameSettings.CONTROL_TILT][index]
+		_settings.touch_control_scheme = [GameSettings.CONTROL_WHEEL, GameSettings.CONTROL_TILT][index]
 		_persist()
 	)
 	scheme_row.add_child(schemes)
@@ -96,7 +98,7 @@ func _build() -> void:
 	var camera_spacer := Control.new()
 	camera_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	camera_row.add_child(camera_spacer)
-	var cameras := OptionButton.new()
+	var cameras := TouchOptionType.new()
 	cameras.custom_minimum_size = Vector2(190.0, 44.0)
 	cameras.add_item("CHASE VIEW")
 	cameras.add_item("COCKPIT VIEW")

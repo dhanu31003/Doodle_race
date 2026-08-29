@@ -34,7 +34,7 @@ func _ready() -> void:
 func _copy_for_route(route: String) -> String:
 	match route:
 		"multiplayer":
-			return "Private room creation, short-code joining, readiness, and host controls are being wired to the verified local backend. Offline play remains available."
+			return "Nearby Android room creation, short-code joining, readiness, and host-phone authority are available without an Internet server."
 		"saved":
 			return "Saved circuits will appear here with deterministic thumbnails, edit, export, and deletion controls."
 		"garage":

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:maxSdkVersion="31" android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:maxSdkVersion="31" android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:maxSdkVersion="30" android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:maxSdkVersion="30" android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:maxSdkVersion="28" android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:minSdkVersion="29" android:maxSdkVersion="31" android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:minSdkVersion="31" android:name="android.permission.BLUETOOTH_ADVERTISE" />
+    <uses-permission android:minSdkVersion="31" android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:minSdkVersion="31" android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:minSdkVersion="32" android:name="android.permission.NEARBY_WIFI_DEVICES" />
+    <uses-permission android:minSdkVersion="37" android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+
+    <application>
+        <meta-data
+            android:name="org.godotengine.plugin.v2.${godotPluginName}"
+            android:value="${godotPluginPackageName}.RaceGlyphNearbyPlugin" />
+    </application>
+</manifest>

@@ -60,7 +60,7 @@ func _build() -> void:
 	menu.add_child(menu_title)
 	_add_route_button(menu, "TRACK STUDIO", "studio", true)
 	_add_route_button(menu, "OFFLINE RACE", "tracks")
-	_add_route_button(menu, "PRIVATE ROOM", "multiplayer")
+	_add_route_button(menu, "NEARBY RACE", "multiplayer")
 	var split := HSeparator.new()
 	split.add_theme_constant_override("separation", 6)
 	menu.add_child(split)

@@ -28,7 +28,7 @@ var ambience_volume: float = 0.58
 var ui_volume: float = 0.88
 var muted: bool = false
 
-var touch_control_scheme: StringName = CONTROL_BUTTONS
+var touch_control_scheme: StringName = CONTROL_WHEEL
 var touch_control_size: float = 1.0
 var touch_control_opacity: float = 0.82
 var touch_control_vertical_offset: float = 0.0
@@ -169,9 +169,9 @@ func effective_volume(category: StringName) -> float:
 
 static func _control_scheme(value: Variant) -> StringName:
 	var scheme := StringName(str(value))
-	if scheme == CONTROL_WHEEL or scheme == CONTROL_TILT:
-		return scheme
-	return CONTROL_BUTTONS
+	# "buttons" remains a read-only migration alias for existing installs. The
+	# mobile product no longer exposes discrete arrow steering.
+	return CONTROL_TILT if scheme == CONTROL_TILT else CONTROL_WHEEL
 
 
 static func _camera_view(value: Variant) -> StringName:

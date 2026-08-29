@@ -15,6 +15,7 @@ const StandingsPanelType := preload("res://game/ui/components/race_standings_pan
 const CatalogType := preload("res://game/content/predefined_track_catalog.gd")
 const VehicleCatalogType := preload("res://game/content/vehicle_catalog.gd")
 const ProtocolType := preload("res://game/network/network_protocol.gd")
+const MobileSteeringWheelType := preload("res://game/ui/components/mobile_steering_wheel.gd")
 
 var payload: Dictionary = {}
 var session: PrivateMultiplayerSession
@@ -27,9 +28,6 @@ var _fixture_mode := false
 var _scheduled_start_tick := 0
 var _started := false
 var _terminal_shown := false
-var _touch_left := false
-var _touch_right := false
-var _wheel_touch_index := -1
 var _track_id := ""
 var _result_recorded := false
 var _selected_vehicle: Dictionary = {}
@@ -270,7 +268,7 @@ func _build() -> void:
 
 
 func _build_telemetry_overlay() -> void:
-	var controls_height := 82.0 * settings.touch_control_size
+	var controls_height := 136.0 * settings.touch_control_size
 	var bottom_clearance := 24.0 + controls_height + 20.0 \
 		+ touch_control_lift_px(settings.touch_control_vertical_offset)
 	var telemetry_safe := DesignSystem.make_margin(26, 22, 26, roundi(bottom_clearance))
@@ -312,7 +310,8 @@ func _configure_runtime() -> void:
 		_scheduled_start_tick,
 		null if _fixture_mode else session,
 		int(payload.get("laps", 3)),
-		bool(payload.get("collisions", true))
+		bool(payload.get("collisions", true)),
+		str(payload.get("authority_mode", "cloud"))
 	)
 	if not result.get("ok", false):
 		_show_terminal(str(result.get("error", {}).get("code", "network_race_configuration_invalid")))
@@ -330,7 +329,10 @@ func _configure_runtime() -> void:
 	minimap.configure_accessibility(SettingsRuntime.requires_non_color_cues(settings))
 	minimap.update_entries(runtime.entries)
 	_room_label.text = "ROOM %s" % str(payload.get("room_code", "------"))
-	_role_label.text = "HOST AUTHORITY" if runtime.is_host else "GUEST PREDICTION"
+	_role_label.text = (
+		"PHONE HOST AUTHORITY" if runtime.is_host and runtime.peer_hosted_authority
+		else ("HOST" if runtime.is_host else "GUEST PREDICTION")
+	)
 	_role_label.add_theme_color_override("font_color", DesignSystem.MINT if runtime.is_host else DesignSystem.CYAN)
 
 
@@ -484,38 +486,20 @@ func _steering_controls() -> Control:
 		tilt_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		tilt_panel.add_child(tilt_label)
 		return tilt_panel
-	if surface == &"wheel":
-		var wheel := PanelContainer.new()
-		wheel.custom_minimum_size = Vector2(224.0, 82.0) * settings.touch_control_size
-		wheel.modulate.a = settings.touch_control_opacity
-		wheel.mouse_filter = Control.MOUSE_FILTER_STOP
-		wheel.add_theme_stylebox_override("panel", DesignSystem.panel_style(Color(0.035, 0.075, 0.13, 0.94), 22, DesignSystem.MINT, 2))
-		var label := DesignSystem.label("◀  STEERING WHEEL  ▶\nDRAG TO TURN", 14, DesignSystem.WHITE)
-		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		wheel.add_child(label)
-		wheel.gui_input.connect(func(event: InputEvent) -> void: _on_wheel_input(event, wheel))
-		return wheel
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-	_add_hold_button(row, "◀", func(value: bool) -> void:
-		_touch_left = value
-		_update_touch_steer()
+	var wheel := MobileSteeringWheelType.new()
+	wheel.name = "AnalogSteeringWheel"
+	wheel.configure(settings.touch_control_size, settings.touch_control_opacity)
+	wheel.steering_changed.connect(func(value: float) -> void:
+		if input_adapter != null:
+			input_adapter.touch_steer = value
 	)
-	_add_hold_button(row, "▶", func(value: bool) -> void:
-		_touch_right = value
-		_update_touch_steer()
-	)
-	return row
+	return wheel
 
 
 static func steering_surface_for_scheme(scheme: StringName) -> StringName:
 	if scheme == GameSettings.CONTROL_TILT:
 		return &"tilt"
-	if scheme == GameSettings.CONTROL_WHEEL:
-		return &"wheel"
-	return &"buttons"
+	return &"wheel"
 
 
 func _pedal_controls() -> Control:
@@ -534,24 +518,6 @@ func _add_hold_button(container: Container, text: String, setter: Callable, prim
 	button.button_down.connect(func() -> void: setter.call(true))
 	button.button_up.connect(func() -> void: setter.call(false))
 	container.add_child(button)
-
-
-func _update_touch_steer() -> void:
-	input_adapter.touch_steer = float(int(_touch_right) - int(_touch_left))
-
-
-func _on_wheel_input(event: InputEvent, wheel: Control) -> void:
-	if event is InputEventScreenTouch:
-		if event.pressed and (_wheel_touch_index < 0 or _wheel_touch_index == event.index):
-			_wheel_touch_index = event.index
-			input_adapter.touch_steer = clampf(event.position.x / maxf(wheel.size.x, 1.0) * 2.0 - 1.0, -1.0, 1.0)
-		elif not event.pressed and event.index == _wheel_touch_index:
-			_wheel_touch_index = -1
-			input_adapter.touch_steer = 0.0
-	elif event is InputEventScreenDrag and event.index == _wheel_touch_index:
-		input_adapter.touch_steer = clampf(event.position.x / maxf(wheel.size.x, 1.0) * 2.0 - 1.0, -1.0, 1.0)
-	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		input_adapter.touch_steer = clampf(event.position.x / maxf(wheel.size.x, 1.0) * 2.0 - 1.0, -1.0, 1.0) if event.pressed else 0.0
 
 
 func _toggle_camera() -> void:
@@ -651,7 +617,7 @@ func _arm_leave() -> void:
 		navigate_requested.emit("home", {})
 		return
 	var warning: Label = _leave_panel.find_child("Warning")
-	warning.text = "You are the simulation host. Leaving ends this v1 race for every driver." if runtime != null and runtime.is_host else "You will leave the race. Other drivers may continue with the host authority."
+	warning.text = "Your phone is hosting this nearby race. Leaving ends it for every driver." if runtime != null and runtime.is_host else "You will leave the race. Other drivers may continue with the nearby phone host."
 	_leave_panel.visible = true
 
 
@@ -720,7 +686,7 @@ func _show_terminal(reason: String) -> void:
 	match reason:
 		"race_complete":
 			_terminal_title.text = "HOST RESULTS LOCKED"
-			_terminal_detail.text = "The host authority completed the race. Private-room v1 ends cleanly when the host leaves these results."
+			_terminal_detail.text = "The nearby phone host completed the race. The room ends cleanly when that host leaves these results."
 		"simulation_host_departed":
 			_terminal_title.text = "HOST LEFT • RACE ENDED"
 			_terminal_detail.text = "RaceGlyph does not pretend to migrate a running simulation. This race ended for every driver."

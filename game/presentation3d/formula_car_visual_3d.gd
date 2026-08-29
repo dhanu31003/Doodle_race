@@ -118,9 +118,12 @@ var _built: bool = false
 # before any meshes are built.
 var _is_player: bool = true
 var _remote_mobile_budget: bool = false
+var _player_mobile_budget: bool = false
 var _remote_render_budget_configured: bool = false
 var _remote_render_budget_apply_count: int = 0
 var _graph_stats_cache: Dictionary = {}
+var _mobile_contact_shadow: MeshInstance3D
+var _player_shadow_defaults: Dictionary = {}
 
 
 func _ready() -> void:
@@ -144,10 +147,13 @@ func configure(
 	# by the complete twelve-car field.
 	_is_player = is_player
 	_remote_mobile_budget = mobile_remote_budget
+	_player_mobile_budget = is_player and mobile_remote_budget
 	if not _built:
 		_ready()
 	set_team_color(color, accent_color)
-	if not _is_player:
+	if _is_player:
+		configure_player_render_budget(_player_mobile_budget)
+	else:
 		configure_remote_render_budget(_remote_mobile_budget)
 	_apply_surface_appearance()
 
@@ -316,6 +322,17 @@ func set_cockpit_detail_visible(value: bool) -> void:
 	if value:
 		_update_driver_sleeves()
 		_update_dashboard(_last_gear, _last_rpm, _last_shifting)
+
+
+func configure_player_render_budget(mobile_budget: bool) -> void:
+	if not _built:
+		_ready()
+	if not _is_player:
+		return
+	_player_mobile_budget = mobile_budget
+	_configure_player_shadow_geometry(self, mobile_budget)
+	if _mobile_contact_shadow != null:
+		_mobile_contact_shadow.visible = mobile_budget
 
 
 func configure_remote_render_budget(mobile_budget: bool) -> void:
@@ -521,7 +538,26 @@ func _build_visual() -> void:
 	_build_steering_wheel_and_driver()
 	_build_lights()
 	_build_surface_coating()
+	_build_mobile_contact_shadow()
 	_build_camera_sockets()
+
+
+func _build_mobile_contact_shadow() -> void:
+	_mobile_contact_shadow = MeshInstance3D.new()
+	_mobile_contact_shadow.name = "MobileContactShadow"
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(4.7, 2.05)
+	var material := StandardMaterial3D.new()
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.albedo_color = Color(0.005, 0.012, 0.018, 0.28)
+	material.roughness = 1.0
+	plane.material = material
+	_mobile_contact_shadow.mesh = plane
+	_mobile_contact_shadow.position.y = 0.018
+	_mobile_contact_shadow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_mobile_contact_shadow.visible = false
+	add_child(_mobile_contact_shadow)
 
 
 func _build_imported_body() -> void:
@@ -1854,6 +1890,20 @@ func _configure_remote_geometry(
 					GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 				)
 		_configure_remote_geometry(child, detail_range, mobile_budget)
+
+
+func _configure_player_shadow_geometry(node: Node, mobile_budget: bool) -> void:
+	for child in node.get_children():
+		if child is GeometryInstance3D and child != _mobile_contact_shadow:
+			var geometry := child as GeometryInstance3D
+			var key := geometry.get_instance_id()
+			if not _player_shadow_defaults.has(key):
+				_player_shadow_defaults[key] = geometry.cast_shadow
+			geometry.cast_shadow = (
+				GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				if mobile_budget else int(_player_shadow_defaults[key])
+			)
+		_configure_player_shadow_geometry(child, mobile_budget)
 
 
 func _add_capsule(

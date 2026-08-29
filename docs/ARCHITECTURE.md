@@ -7,7 +7,7 @@ Status: **implemented candidate architecture**. The boundaries below describe th
 - Godot 4.7.1 stable and GDScript, with deterministic 2D race authority mapped into a dedicated world-space 3D race renderer.
 - Landscape Android/iOS client; desktop/editor builds are development surfaces.
 - Deterministic data-first track generation and race rules separated from scenes.
-- Offline-first client with a replaceable Nakama multiplayer adapter.
+- Offline-first client with a replaceable transport; the Android test build selects Google Nearby Connections.
 - Custom headless GDScript runner, integration scenes, deterministic visual scenes, and export smoke checks.
 
 The decisions are recorded in `adr/0001-engine-and-language.md` and `adr/0002-multiplayer-architecture.md`.
@@ -40,7 +40,7 @@ Dependencies point inward. Domain code must not read the scene tree, renderer, c
 | `game/ai` | perception, decisions, personalities, recovery | sprite/animation state |
 | `game/race` | countdown, checkpoints, laps, order, finish | backend transport |
 | `game/presentation3d` | coordinate mapping, generated track mesh, Formula-car visuals, fixed scenery, daylight, and cockpit/chase cameras | authority mutation and race decisions |
-| `game/network`, `backend` | protocol/client adapter plus Nakama RPC/match lifecycle | generated pixels and decoration |
+| `game/network`, `native/nearby-plugin` | protocol/client adapter plus Nearby discovery/message lifecycle | generated pixels and decoration |
 | `game/persistence` | atomic repository, backup, migrations, portable export/deletion | concrete UI |
 | `game/ui`, `game/ui/input` | safe areas, haptics, lifecycle-facing controls, camera presentation | domain rules |
 | `game/ui`, `game/audio` | presentation and audio routing | authority decisions |
@@ -64,7 +64,7 @@ Dependencies point inward. Domain code must not read the scene tree, renderer, c
 - Bridge layer is part of vehicle/progress state and collision filtering.
 - AI produces the same input command type as human controls.
 
-Offline uses the local simulation directly. Protocol-4 multiplayer uses the Nakama match runtime as 60 Hz simulation authority. Every phone sends bounded inputs, predicts its own car immediately, interpolates remote snapshots, and reconciles to cloud state. The room creator controls lobby policy but never publishes race snapshots or results. Backend unavailability never disables offline services.
+Offline uses the local simulation directly. The Android protocol-4 test mode uses Google Nearby Connections with `P2P_STAR`: the creating phone owns the 60 Hz deterministic simulation, guests send bounded inputs, predict their own cars immediately, interpolate remote snapshots, and reconcile to host state. The room code filters discovery at the application layer; verified track manifests still gate Ready. Host departure ends the casual room. No Internet server, account, or PC is involved.
 
 The inventoried `icon_boost.svg` and `boost.wav` resources are dormant legacy/internal compatibility assets. No shipped control, AI command, or network message can activate boost, and no player-facing screen exposes either resource. Their eventual package inclusion/exclusion remains an asset-ledger decision, not a gameplay feature.
 
@@ -80,9 +80,9 @@ World rendering, HUD, camera, particles, and audio subscribe to domain events. C
 - Migration operates on a backup and is idempotent.
 - Corrupt or future-version data is quarantined, not silently overwritten.
 
-## Backend boundary
+## Multiplayer platform boundary
 
-The implemented local stack is Nakama `3.40.0` (`sha256:92fb184e3271be12fd4d239766afb285322a50aaf769a59433445d59624c78cd`) plus PostgreSQL `17.9-alpine3.23` (`sha256:c7526c0f6c3f30260a563d7bcf8ad778effac59a44f8ffa86678c35418338609`) in Docker Compose. The vendored Nakama Godot SDK is `3.4.0` at commit `14b7f7078a9822c15b0424624e4c883c87730cee`. Nakama handles anonymous sessions, short-code RPCs, room/match presence, transient track-manifest relay, and race messages; it does not persist or own generated geometry. Production secrets, TLS, DNS, encrypted backups, monitoring, retention, and hosting remain deployment concerns requiring explicit approval.
+The Android plugin is a Godot Android v2 AAR using Google Play services Nearby `19.4.0`. It exposes runtime permission status, discovery, star connections, reliable byte payloads, bounded fragmentation, and disconnect events; all room/race authority stays in testable GDScript. The APK targets API 36 and supports API 24+, with manifest permissions scoped by Android version. The retained Nakama/PostgreSQL implementation is deferred source for a possible later Internet service and is excluded from this Android APK.
 
 ## Determinism and compatibility
 
@@ -101,8 +101,8 @@ Domain errors use stable codes with stage and safe context. Logs are structured 
 - Strict size, type, enum, finite-number, rate, and range validation at every trust boundary.
 - Host authority is not cheat-proof; this limitation is explicit and acceptable only for private casual rooms.
 - No deserialization into executable Godot objects from network payloads.
-- Nakama session/reconnect material currently remains in runtime memory and is cleared on leave/reset/local deletion. Platform secure-store persistence is not implemented. Secrets never enter repository config.
+- Nearby endpoint IDs, room messages, and reconnect material remain in runtime memory and are cleared on leave/reset/local deletion. No multiplayer credential or server secret is persisted.
 
 ## Current implementation status
 
-The repository contains the end-to-end offline flow, strict track pipeline, persistence/settings services, race/AI authority, true 3D race presentation, Nakama client/backend adapters, and mobile export presets described above. Local headless runners, deterministic capture scenes, backend drills, and export tooling are also implemented. Consult `PROJECT_STATUS.md` for the current candidate state and `TEST_REPORT.md` for evidence; these source boundaries do not establish public-service, signed-store, physical-device, thermal, or cross-platform determinism results.
+The repository contains the end-to-end offline flow, strict track pipeline, persistence/settings services, race/AI authority, true 3D race presentation, Android Nearby plugin/transport, retained deferred cloud adapters, and mobile export presets described above. Local headless runners, deterministic capture scenes, and export tooling are also implemented. Consult `PROJECT_STATUS.md` for the current candidate state and `TEST_REPORT.md` for evidence; these source boundaries do not establish signed-store, physical two-device, thermal, or iOS Nearby results.

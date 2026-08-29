@@ -1,15 +1,15 @@
 extends Control
-## Private-room product flow. Nothing here runs a public matchmaker: players
-## explicitly create or join a six-character room on the configured endpoint.
+## Nearby-room product flow. Players physically close to each other create or
+## join a six-character room without an internet service or public matchmaker.
 
 signal navigate_requested(route: String, payload: Dictionary)
 
 const Limits := preload("res://game/network/network_limits.gd")
-const Endpoint := preload("res://game/network/client/network_endpoint.gd")
 const Catalog := preload("res://game/content/predefined_track_catalog.gd")
 const Compiler := preload("res://game/track/generation/track_compiler.gd")
 const VehicleCatalog := preload("res://game/content/vehicle_catalog.gd")
 const TrackDefinitionType := preload("res://game/track/definition/track_definition.gd")
+const TouchOptionType := preload("res://game/ui/components/touch_safe_option_button.gd")
 
 var payload: Dictionary = {}
 var session: PrivateMultiplayerSession
@@ -23,14 +23,11 @@ var _root: VBoxContainer
 var _status: Label
 var _name_edit: LineEdit
 var _code_edit: LineEdit
-var _host_edit: LineEdit
-var _port_spin: SpinBox
-var _scheme_option: OptionButton
 var _create_button: Button
 var _join_button: Button
 var _roster_list: VBoxContainer
-var _track_option: OptionButton
-var _laps_option: OptionButton
+var _track_option: TouchSafeOptionButton
+var _laps_option: TouchSafeOptionButton
 var _collisions_toggle: CheckButton
 var _track_detail: Label
 var _track_hash: Label
@@ -103,14 +100,10 @@ func _build_shell() -> void:
 	var back := DesignSystem.screen_button("‹ PADDOCK")
 	back.pressed.connect(_back_or_leave)
 	top.add_child(back)
-	var title := DesignSystem.title("PRIVATE ROOM", 38)
+	var title := DesignSystem.title("NEARBY MULTIPLAYER", 38)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(title)
-	_status = DesignSystem.label(
-		"ONLINE PRIVATE ROOMS" if Endpoint.uses_public_service() else "LOCAL / PRIVATE BACKEND",
-		14,
-		DesignSystem.MINT
-	)
+	_status = DesignSystem.label("ANDROID • NO INTERNET REQUIRED", 14, DesignSystem.MINT)
 	_status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	top.add_child(_status)
 
@@ -135,7 +128,7 @@ func _build_entry() -> void:
 	foot.add_theme_constant_override("separation", 14)
 	_root.add_child(foot)
 	var privacy := DesignSystem.label(
-		"Anonymous random install identity • no hardware ID • room credentials stay in memory",
+		"Nearby permissions only while finding friends • no account • no internet server",
 		13, DesignSystem.MUTED
 	)
 	privacy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -144,11 +137,7 @@ func _build_entry() -> void:
 	var offline := DesignSystem.button("PLAY OFFLINE INSTEAD", false, true)
 	offline.pressed.connect(func() -> void: navigate_requested.emit("tracks", {}))
 	foot.add_child(offline)
-	_status.text = (
-		"SECURE GLOBAL SERVICE • OFFLINE PLAY UNAFFECTED"
-		if Endpoint.uses_public_service()
-		else "LOCAL / PRIVATE BACKEND • OFFLINE PLAY UNAFFECTED"
-	)
+	_status.text = "GOOGLE NEARBY • DEVICE-TO-DEVICE • OFFLINE PLAY UNAFFECTED"
 	_status.add_theme_color_override("font_color", DesignSystem.MINT)
 
 
@@ -166,7 +155,7 @@ func _build_identity_card() -> PanelContainer:
 	content.add_child(DesignSystem.label("YOUR DRIVER", 15, DesignSystem.MINT))
 	content.add_child(DesignSystem.title("RACE WITH FRIENDS", 34))
 	var explanation := DesignSystem.label(
-		"Create a short-code room for up to 12 drivers. Every device builds the selected circuit locally and must match its fingerprint before Ready unlocks.",
+		"Create a short-code room for nearby phones and tablets. The creator phone runs race authority; every device verifies the circuit before Ready unlocks.",
 		17, DesignSystem.MUTED
 	)
 	explanation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -175,7 +164,7 @@ func _build_identity_card() -> PanelContainer:
 	content.add_child(DesignSystem.label("DRIVER NAME  •  1–24 CHARACTERS", 12, DesignSystem.MUTED))
 	_name_edit = _line_edit("Driver", Limits.MAX_DISPLAY_NAME_LENGTH)
 	content.add_child(_name_edit)
-	_create_button = DesignSystem.button("CREATE PRIVATE ROOM  ›", true, true)
+	_create_button = DesignSystem.button("CREATE NEARBY ROOM  ›", true, true)
 	_create_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_create_button.pressed.connect(_create_room)
 	content.add_child(_create_button)
@@ -201,7 +190,7 @@ func _build_join_card() -> PanelContainer:
 	_code_edit.add_theme_font_size_override("font_size", 31)
 	_code_edit.text_changed.connect(_sanitize_room_code)
 	content.add_child(_code_edit)
-	var code_help := DesignSystem.label("Example A7K9Q2 • not an active room", 11, DesignSystem.MUTED)
+	var code_help := DesignSystem.label("The host must be nearby, awake, and showing its room", 11, DesignSystem.MUTED)
 	code_help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(code_help)
 	_join_button = DesignSystem.button("JOIN ROOM", true, true)
@@ -210,40 +199,13 @@ func _build_join_card() -> PanelContainer:
 	content.add_child(_join_button)
 	var split := HSeparator.new()
 	content.add_child(split)
-	if Endpoint.uses_public_service():
-		var service := DesignSystem.label(
-			"SECURE ONLINE SERVICE • HTTPS/WSS • NO PC REQUIRED",
-			12,
-			DesignSystem.MINT
-		)
-		service.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		content.add_child(service)
-		return panel
-	content.add_child(DesignSystem.label("LOCAL BACKEND ENDPOINT", 12, DesignSystem.MUTED))
-	var endpoint_row := HBoxContainer.new()
-	endpoint_row.add_theme_constant_override("separation", 8)
-	content.add_child(endpoint_row)
-	var defaults := Endpoint.from_runtime_overrides()
-	_host_edit = _line_edit(str(defaults["host"]), 253)
-	_host_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_host_edit.tooltip_text = "Desktop local default is 127.0.0.1; Android emulator local default is 10.0.2.2."
-	endpoint_row.add_child(_host_edit)
-	_port_spin = SpinBox.new()
-	_port_spin.min_value = 1
-	_port_spin.max_value = 65_535
-	_port_spin.step = 1
-	_port_spin.value = int(defaults["port"])
-	_port_spin.custom_minimum_size.x = 112.0
-	endpoint_row.add_child(_port_spin)
-	_scheme_option = OptionButton.new()
-	_scheme_option.add_item("HTTP")
-	_scheme_option.add_item("HTTPS")
-	_scheme_option.select(1 if str(defaults["scheme"]) == "https" else 0)
-	_scheme_option.custom_minimum_size.x = 92.0
-	endpoint_row.add_child(_scheme_option)
-	var warning := DesignSystem.label("Development endpoint only. No public service is configured in this build.", 12, DesignSystem.GOLD)
-	warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	content.add_child(warning)
+	var service := DesignSystem.label(
+		"GOOGLE NEARBY • ENCRYPTED DEVICE-TO-DEVICE • NO MOBILE DATA",
+		12,
+		DesignSystem.MINT
+	)
+	service.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(service)
 	return panel
 
 
@@ -310,7 +272,7 @@ func _build_track_card(snapshot: Dictionary) -> PanelContainer:
 	content.add_theme_constant_override("separation", 9)
 	panel.add_child(content)
 	content.add_child(DesignSystem.label("CIRCUIT AUTHORITY", 14, DesignSystem.MINT))
-	_track_option = OptionButton.new()
+	_track_option = TouchOptionType.new()
 	_track_option.custom_minimum_size.y = 44.0
 	_track_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_track_choices = _available_tracks()
@@ -325,7 +287,7 @@ func _build_track_card(snapshot: Dictionary) -> PanelContainer:
 	rules_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	rules_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	rules.add_child(rules_label)
-	_laps_option = OptionButton.new()
+	_laps_option = TouchOptionType.new()
 	_laps_option.custom_minimum_size = Vector2(112.0, 38.0)
 	for lap_count in Limits.ALLOWED_MULTIPLAYER_LAPS:
 		_laps_option.add_item("%d %s" % [lap_count, "LAP" if lap_count == 1 else "LAPS"], lap_count)
@@ -544,8 +506,8 @@ func _refresh_roster(snapshot: Dictionary) -> void:
 func _create_room() -> void:
 	if _busy or session == null:
 		return
-	_set_busy(true, "CONNECTING TO PRIVATE BACKEND…")
-	var result := await session.create_room_async(_name_edit.text, _endpoint_value())
+	_set_busy(true, "STARTING NEARBY ROOM…")
+	var result := await session.create_room_async(_name_edit.text)
 	_set_busy(false)
 	if result.get("ok", false):
 		_build_lobby(session.public_snapshot())
@@ -556,8 +518,8 @@ func _create_room() -> void:
 func _join_room() -> void:
 	if _busy or session == null:
 		return
-	_set_busy(true, "CHECKING ROOM CODE…")
-	var result := await session.join_room_async(_code_edit.text, _name_edit.text, _endpoint_value())
+	_set_busy(true, "SCANNING FOR NEARBY ROOM…")
+	var result := await session.join_room_async(_code_edit.text, _name_edit.text)
 	_set_busy(false)
 	if result.get("ok", false):
 		_build_lobby(session.public_snapshot())
@@ -832,17 +794,6 @@ func _available_tracks() -> Array[Dictionary]:
 					"source": "saved custom",
 				})
 	return output
-
-
-func _endpoint_value() -> Dictionary:
-	if Endpoint.uses_public_service():
-		return Endpoint.from_runtime_overrides()
-	return Endpoint.sanitize({
-		"host": _host_edit.text if _host_edit != null else "",
-		"port": int(_port_spin.value) if _port_spin != null else Endpoint.DEFAULT_PORT,
-		"scheme": "https" if _scheme_option != null and _scheme_option.selected == 1 else "http",
-		"server_key": Endpoint.DEFAULT_SERVER_KEY,
-	})
 
 
 func _line_edit(text: String, maximum: int) -> LineEdit:

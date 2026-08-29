@@ -8,6 +8,8 @@ const TrackerType := preload("res://game/race/lap_tracker.gd")
 const TelemetryType := preload("res://game/ui/components/race_telemetry_cluster.gd")
 const StandingsType := preload("res://game/ui/components/race_standings_panel.gd")
 const DesignSystemType := preload("res://game/ui/design_system.gd")
+const SteeringWheelType := preload("res://game/ui/components/mobile_steering_wheel.gd")
+const TouchOptionType := preload("res://game/ui/components/touch_safe_option_button.gd")
 
 const MOBILE_VIEWPORT := Vector2(1280.0, 720.0)
 const WIDE_MOBILE_VIEWPORT := Vector2(1560.0, 720.0)
@@ -21,6 +23,7 @@ func _run() -> void:
 	var test := TestCaseType.new()
 	_test_authoritative_rows(test)
 	_test_telemetry_sanitization(test)
+	await _test_mobile_touch_components(test)
 	await _test_render_surfaces(test)
 	DesignSystemType.configure_ui_scale(1.0)
 	var result: Dictionary = test.result("race_hud_components")
@@ -58,6 +61,41 @@ func _test_telemetry_sanitization(test: RefCounted) -> void:
 	test.assert_near(TelemetryType.normalized_rev(18_000.0, 12_500.0), 1.0, 0.0001, "rev band clamps beyond redline")
 	test.assert_near(TelemetryType.normalized_rev(-100.0, 12_500.0), 0.0, 0.0001, "rev band rejects negative RPM")
 	test.assert_near(TelemetryType.normalized_rev(NAN, 0.0), 0.0, 0.0001, "non-finite telemetry cannot poison the draw path")
+
+
+func _test_mobile_touch_components(test: RefCounted) -> void:
+	var wheel := SteeringWheelType.new()
+	wheel.configure(1.0, 0.82)
+	wheel.size = Vector2(136.0, 136.0)
+	root.add_child(wheel)
+	var emitted: Array[float] = []
+	wheel.steering_changed.connect(func(value: float) -> void: emitted.append(value))
+	wheel._set_axis_from_local(Vector2(136.0, 68.0))
+	test.assert_near(wheel.steering_value, 1.0, 0.0001, "analog wheel reaches full right lock at the outer grip")
+	wheel._set_axis_from_local(Vector2(0.0, 68.0))
+	test.assert_near(wheel.steering_value, -1.0, 0.0001, "analog wheel reaches full left lock at the outer grip")
+	wheel._release_steering()
+	test.assert_near(wheel.steering_value, 0.0, 0.0001, "analog wheel authority centers immediately on release")
+	test.assert_true(emitted.size() >= 3 and is_zero_approx(emitted[-1]), "wheel publishes the centered release value")
+	wheel.queue_free()
+
+	var option := TouchOptionType.new()
+	option.add_item("SMOOTH")
+	option.add_item("BUMPY")
+	option.add_item("MUD")
+	root.add_child(option)
+	await process_frame
+	var contract: Dictionary = option.debug_touch_contract()
+	test.assert_equal(int(contract["selection_action_mode"]), BaseButton.ACTION_MODE_BUTTON_RELEASE, "mobile selector commits only on button release")
+	test.assert_true(int(contract["scroll_deadzone"]) >= 18, "mobile selector reserves finger travel for scrolling")
+	test.assert_true(bool(contract["horizontal_scroll_disabled"]), "mobile option sheet scrolls only in the list direction")
+	var selected_events: Array[int] = []
+	option.item_selected.connect(func(index: int) -> void: selected_events.append(index))
+	option._commit(2)
+	test.assert_equal(option.selected, 2, "explicit tap-release commits the chosen option")
+	test.assert_equal(selected_events, [2], "tap-release emits exactly one selection event")
+	option.queue_free()
+	await process_frame
 
 
 func _test_render_surfaces(test: RefCounted) -> void:

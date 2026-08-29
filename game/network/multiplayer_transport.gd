@@ -1,7 +1,7 @@
 class_name MultiplayerTransport
 extends RefCounted
-## Transport boundary shared by the deterministic fake and pinned Nakama
-## adapter. No gameplay code depends on Nakama SDK types.
+## Transport boundary shared by deterministic tests, Android Nearby, and the
+## retained cloud adapter. Gameplay code depends on no platform SDK type.
 
 const Result := preload("res://game/network/network_result.gd")
 

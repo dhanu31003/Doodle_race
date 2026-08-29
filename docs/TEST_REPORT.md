@@ -1,12 +1,12 @@
 # Test Report
 
-Status: **current mobile-quality local evidence index**, updated 2026-07-26.
+Status: **current mobile-quality local evidence index**, updated 2026-08-19.
 
 ## Verdict
 
-The current mobile-quality game passes the complete normal automated gate for the established rendering/physics baseline. Protocol 4 additionally passed 401 deterministic network assertions, 89 real Nakama E2E assertions, and a 1,002-assertion 12-client cloud-authority load on 2026-08-18. There is deliberately no claim of a new one-shot `tools/qa/run_all_checks.sh --release` PASS: the full frozen soak and backend operational components remain represented by older targeted evidence. The 2026-07-23 one-shot release result below remains historical pre-upgrade regression evidence only.
+The Android 0.6.0 candidate retains the established complete-gate baseline and passes the current focused change suite: 364 persistence/settings assertions, 80 mobile HUD/input assertions, 78 offline race-screen assertions, 117 true-3D world assertions, 423 deterministic network assertions, 13 clean UI routes, 26 landscape/notched accessibility layouts, and 71 presentation mesh assertions. The older Nakama E2E/load records below remain historical cloud-prototype evidence and do not describe the selected APK transport.
 
-The current mobile-optimized Android APK passes static/signature audit, but its shipping Vulkan renderer could not present a surface in the available API 36 emulator's SwiftShader or host-GPU backend. A temporary non-shipping GL-compatibility smoke build did render and navigate through menu, setup, a twelve-car race, and active driving. The current unsigned iOS Xcode project passes static export audit, but no eligible iOS build/signing destination exists on this host.
+The current [`../builds/android/RaceGlyph-0.6.0-release.apk`](../builds/android/RaceGlyph-0.6.0-release.apk), SHA-256 `6036715fe32994ca2776a41e934e19b4bbc8a0dda1183b2657c00cd31c5c2f00`, passes ZIP, metadata, modern APK signature, native-architecture, permission, and native Nearby-plugin inspection. The matching [`../builds/android/RaceGlyph-0.6.0-release.aab`](../builds/android/RaceGlyph-0.6.0-release.aab), SHA-256 `26f1ee4d753277d0596ea6517953311d36ef87508bffb34e1d6a89df225f4563`, passes ZIP and JAR signature verification with the dedicated Neutale upload certificate. Both are `0.6.0` (`6`), API 24–36, ARM64. No physical Android device was attached, so actual radio pairing, gameplay across two devices, sustained performance, and lifecycle behavior still require phone/tablet testing.
 
 The product remains **NO-GO for public/store release**. The evidence is from a dirty/untracked tree rather than a clean immutable candidate; no physical-device, 30-minute thermal, signed Android release AAB, complete iOS build/archive/TestFlight, public TLS/staging/production backend, final legal/privacy/asset, or store approval exists.
 

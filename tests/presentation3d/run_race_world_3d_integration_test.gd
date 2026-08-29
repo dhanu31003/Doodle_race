@@ -20,6 +20,10 @@ func _initialize() -> void:
 
 func _run() -> void:
 	var test := TestCaseType.new()
+	test.assert_equal(RaceWorldType.viewport_shrink_for_profile(false, true), 2, "normal mobile profile halves only the 3D render resolution")
+	test.assert_equal(RaceWorldType.viewport_shrink_for_profile(true, true), 2, "low mobile profile keeps the legible half-resolution 3D budget")
+	test.assert_equal(RaceWorldType.viewport_shrink_for_profile(false, false), 1, "desktop profile retains native 3D render resolution")
+	test.assert_near(RaceWorldType.shadow_distance_for_profile(false, true), 96.0, 0.001, "normal mobile profile bounds directional shadow work")
 	var fixture := _compiled_query("builtin-evergreen-oval")
 	test.assert_true(bool(fixture.get("valid", false)), "true-world fixture compiles a built-in circuit")
 	if bool(fixture.get("valid", false)):
@@ -252,7 +256,7 @@ func _test_true_world_contract(test: RefCounted, query: RaceTrackQuery) -> void:
 	)
 	test.assert_equal(
 		int(configured.get("viewport_stretch_shrink", 0)), 2,
-		"mobile low tier halves only the 3D viewport render dimensions"
+		"mobile low tier reduces only the 3D viewport render dimensions"
 	)
 	test.assert_equal(
 		int(configured.get("viewport_msaa_3d", -1)), Viewport.MSAA_DISABLED,
@@ -267,6 +271,10 @@ func _test_true_world_contract(test: RefCounted, query: RaceTrackQuery) -> void:
 		float(configured.get("sun_shadow_max_distance", 999.0)) <= 145.01
 				and not bool(configured.get("fog_enabled", true)),
 		"mobile low tier bounds directional shadows and disables full-screen fog"
+	)
+	test.assert_false(
+		bool(configured.get("sun_shadow_enabled", true)),
+		"mobile low tier uses authored contact shadows instead of a directional shadow atlas"
 	)
 
 	var initial_track_transform: Transform3D = world.debug_track_root().transform
@@ -454,13 +462,13 @@ func _test_true_world_contract(test: RefCounted, query: RaceTrackQuery) -> void:
 		"steady-state race updates never rebuild track, terrain, or scenery"
 	)
 	test.assert_true(
-		int(steady_state.get("mobile_remote_animation_stride", 0)) == 2
+		int(steady_state.get("mobile_remote_animation_stride", 0)) == 3
 				and int(steady_state.get("remote_animation_update_count", 0)) > 0
 				and int(steady_state.get("remote_animation_skip_count", 0)) > 0
 				and abs(
-					int(steady_state.get("remote_animation_update_count", 0))
+					int(steady_state.get("remote_animation_update_count", 0)) * 2
 							- int(steady_state.get("remote_animation_skip_count", 0))
-				) <= 1,
+				) <= 2,
 		"mobile distributes opponent animation evenly while every transform remains live"
 	)
 	test.assert_equal(

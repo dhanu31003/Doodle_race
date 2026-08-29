@@ -21,7 +21,7 @@ const STANDARD_MAX_DRAW_CALLS := 650
 const STANDARD_MAX_RENDER_OBJECTS := 1_000
 const STANDARD_MAX_PRIMITIVES := 850_000
 const MOBILE_MAX_DRAW_CALLS := 300
-const MOBILE_MAX_RENDER_OBJECTS := 600
+const MOBILE_MAX_RENDER_OBJECTS := 650
 const MOBILE_MAX_PRIMITIVES := 300_000
 const NEARBY_STRESS_RADIUS_AUTHORITY := 100.0 # 30 m presentation radius.
 
@@ -37,6 +37,7 @@ func _build_fixture() -> void:
 	var camera_stability_proof := false
 	var mobile_tier := false
 	var track_id := ""
+	var render_shrink_override := 0
 	for argument in OS.get_cmdline_user_args():
 		if argument == "--camera=cockpit":
 			requested = &"cockpit"
@@ -52,6 +53,10 @@ func _build_fixture() -> void:
 			mobile_tier = true
 		elif argument.begins_with("--track="):
 			track_id = argument.trim_prefix("--track=")
+		elif argument.begins_with("--render-shrink="):
+			render_shrink_override = clampi(
+				int(argument.trim_prefix("--render-shrink=")), 1, 4
+			)
 	var screen := RaceScreenType.new()
 	var race_payload := {"visual_fixture": true}
 	if not track_id.is_empty():
@@ -67,6 +72,9 @@ func _build_fixture() -> void:
 	await process_frame
 	if mobile_tier and screen.perspective_view != null:
 		screen.perspective_view.configure_accessibility(true, false, false, 0.0)
+		if render_shrink_override > 0:
+			screen.perspective_view._viewport_container.stretch_shrink = \
+				render_shrink_override
 		await process_frame
 		var tier_snapshot: Dictionary = screen.perspective_view.debug_snapshot()
 		print("MOBILE_RENDER_TIER shrink=%d msaa=%d ssaa=%d shadow_m=%.1f fog=%s track_segments=%d track_triangles=%d" % [

@@ -1,9 +1,8 @@
 class_name NetworkRaceRuntime
 extends RefCounted
-## Cloud-authoritative race bridge. Every phone predicts only its own
-## conventional-control car, reconciles against Nakama snapshots, and
-## interpolates remote cars. The room creator has lobby controls but never owns
-## race physics, snapshots, or results.
+## Authoritative race bridge. Cloud rooms keep authority remote; nearby rooms
+## run the same deterministic authority on the creator phone while guests
+## predict locally and reconcile to its bounded snapshots.
 
 signal outbound_envelope(envelope: Dictionary)
 signal terminal(reason: String)
@@ -40,6 +39,7 @@ var suspended := false
 var finished := false
 var terminal_reason := ""
 var is_host := false
+var peer_hosted_authority := false
 var last_reconcile_error_q := Vector2i.ZERO
 var last_hard_reconcile := false
 var authoritative_results: Array[Dictionary] = []
@@ -71,7 +71,8 @@ func configure(
 		scheduled_start_tick: int,
 		session_value: Variant = null,
 		lap_count: int = 3,
-		vehicle_collisions: bool = true
+		vehicle_collisions: bool = true,
+		authority_mode: String = "cloud"
 	) -> Dictionary:
 	if compiled_track == null or local_id.is_empty() or host_id.is_empty() or code.is_empty() or epoch <= 0:
 		return {"ok": false, "error": {"code": "network_race_configuration_invalid", "message": "Network race configuration is incomplete."}}
@@ -89,6 +90,7 @@ func configure(
 	global_tick = start_tick
 	latest_authoritative_tick = start_tick
 	is_host = local_player_id == host_player_id
+	peer_hosted_authority = authority_mode == "peer_host"
 	_session = session_value
 	# At a 60 Hz fixed simulation, a nominal 15 Hz scheduler gate yields a
 	# deterministic every-five-tick publication after integer millisecond
@@ -150,7 +152,10 @@ func advance_frame(delta: float, command: RaceInput) -> int:
 	var steps := 0
 	while _accumulator + 0.000000001 >= FIXED_DT and steps < MAX_STEPS_PER_FRAME:
 		_accumulator -= FIXED_DT
-		_guest_tick()
+		if peer_hosted_authority and is_host:
+			_host_tick()
+		else:
+			_guest_tick()
 		steps += 1
 	_sample_remote_presentation()
 	return steps
@@ -159,7 +164,19 @@ func advance_frame(delta: float, command: RaceInput) -> int:
 func handle_event(event: Dictionary) -> Dictionary:
 	var opcode := int(event.get("opcode", -1))
 	if opcode == Protocol.OP_INPUT_FRAME:
-		return {"ok": false, "error": {"code": "peer_input_not_consumed"}}
+		if not peer_hosted_authority or not is_host:
+			return {"ok": false, "error": {"code": "peer_input_not_consumed"}}
+		var sender_id := str(event.get("sender_id", ""))
+		if sender_id == local_player_id or not _slot_by_player.has(sender_id):
+			return {"ok": false, "error": {"code": "peer_input_sender_invalid"}}
+		var decoded := Codec.command_from_payload(event.get("payload", {}))
+		if not decoded.get("ok", false):
+			return decoded
+		_remote_inputs[sender_id] = {
+			"tick": int(event.get("tick", -1)),
+			"command": decoded["value"],
+		}
+		return {"ok": true, "value": {"sender_id": sender_id}}
 	if opcode == Protocol.OP_STATE_SNAPSHOT:
 		return _handle_snapshot(event)
 	if opcode == Protocol.OP_RESUME:
@@ -246,6 +263,8 @@ func _host_tick() -> void:
 	if director.fixed_tick == 1 or director.fixed_tick % 5 == 0:
 		_scheduler.mark_snapshot_sent(global_tick * 1000 / Limits.SIMULATION_HZ)
 		_publish_snapshot()
+	if director.phase == DirectorType.PHASE_RESULTS and not _completion_sent:
+		_publish_completion()
 
 
 func _guest_tick() -> void:
