@@ -538,7 +538,8 @@ func _build_visual() -> void:
 	_build_steering_wheel_and_driver()
 	_build_lights()
 	_build_surface_coating()
-	_build_mobile_contact_shadow()
+	if _is_player:
+		_build_mobile_contact_shadow()
 	_build_camera_sockets()
 
 

@@ -2,6 +2,8 @@ extends Control
 
 signal navigate_requested(route: String, payload: Dictionary)
 
+const PRIVACY_POLICY_URL := "https://github.com/dhanu31003/Doodle_race/blob/main/PRIVACY.md"
+
 
 func _ready() -> void:
 	_build()
@@ -47,7 +49,11 @@ func _build() -> void:
 	_add_section(content, "GENERATED KEY ART", DesignSystem.CYAN,
 		"The splash and store key art was generated specifically for RaceGlyph with OpenAI image generation, then visually reviewed and prepared for runtime use. Its project source and final WebP are preserved in the shipped asset ledger. No real-world racing identity was requested or intentionally incorporated.")
 	_add_section(content, "PRIVACY", DesignSystem.GOLD,
-		"Offline play, settings, saved tracks, selected car, lap records, and results stay in the app's local sandbox. RaceGlyph has no advertising, analytics, telemetry, chat, or account requirement. Settings can export a verified copy, reset race progress, or delete all local data. Nearby races ask for Android Nearby devices permissions only to discover and connect to nearby friends; room state stays device-to-device.")
+		"Offline play, settings, saved tracks, selected car, lap records, and results stay in the app's local sandbox. RaceGlyph has no advertising, marketing analytics, chat, or account requirement. Settings can export a verified copy, reset race progress, or delete all local data. Nearby races ask for Android Nearby devices permissions only to discover and connect to nearby friends; room state stays device-to-device. Google Play services may collect limited Nearby connection diagnostics as described in the privacy policy.")
+	var privacy_policy := DesignSystem.button("OPEN PRIVACY POLICY", false, true)
+	privacy_policy.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	privacy_policy.pressed.connect(func() -> void: OS.shell_open(PRIVACY_POLICY_URL))
+	content.add_child(privacy_policy)
 	_add_section(content, "GODOT ENGINE — MIT LICENSE", DesignSystem.CORAL,
 		"Copyright © 2014-present Godot Engine contributors. Copyright © 2007-2014 Juan Linietsky, Ariel Manzur.\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the ‘Software’), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED ‘AS IS’, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.")
 	_add_section(content, "MULTIPLAYER SOFTWARE", DesignSystem.MUTED,
