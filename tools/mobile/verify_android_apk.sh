@@ -154,8 +154,9 @@ check_equal "minimum SDK" "${expected_min_sdk}" "${min_sdk}"
 check_equal "target SDK" "${expected_target_sdk}" "${target_sdk}"
 check_equal "native architectures" "${expected_native_code}" "${native_code}"
 check_equal "application label" "${expected_label}" "${application_label}"
+archive_entries="$(unzip -Z1 "${apk_path}")"
 if [[ -z "${application_icon}" || "${application_icon}" != res/*.xml ]] \
-    || ! unzip -Z1 "${apk_path}" | grep -Fxq "${application_icon}"; then
+    || ! grep -Fxq "${application_icon}" <<<"${archive_entries}"; then
   fail_check "adaptive launcher icon resource is missing from the release APK"
 fi
 check_equal "requested permissions" "${expected_permissions}" "${permissions}"
