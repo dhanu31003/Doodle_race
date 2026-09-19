@@ -1,6 +1,6 @@
 # RaceGlyph Privacy Policy
 
-Effective date: August 30, 2026
+Effective date: September 20, 2026 (advertising changes apply starting with Android version 0.7.0)
 
 RaceGlyph (`com.raceglyph.game`) is published by Neutale. This policy explains how the Android version of RaceGlyph handles information.
 
@@ -18,9 +18,19 @@ During a nearby room, RaceGlyph exchanges transient game information with the co
 
 Google states that the Nearby Connections SDK collects usage analytics, including performance metrics such as discovery and connection latency, reliability, and throughput, and device information such as device model, country, build version, and application package name. Google uses this information to improve the Nearby experience, and collection is controlled through the device's Google Usage & diagnostics setting. Google's handling of that information is governed by the [Google Privacy Policy](https://policies.google.com/privacy).
 
-## Information RaceGlyph does not collect
+## Advertising and privacy choices
 
-RaceGlyph does not require an account and does not include advertising, targeted advertising, marketing analytics, crash reporting, chat, contact-list access, photo or media access, or microphone access. Neutale does not sell or share RaceGlyph player information for advertising.
+Starting with Android version 0.7.0, RaceGlyph uses Google AdMob to show occasional interstitial ads when returning to the paddock after completed offline races. There are no ads while driving, drawing a track, or playing Nearby multiplayer. An unavailable ad never prevents play.
+
+On the device, you choose either age 18 or older, or under 18 / prefer not to say. No birth date is requested. For under-18 or unspecified ages, RaceGlyph does not initialize the advertising SDK or request ads. You can change the local age choice in Settings. For adults, Google's User Messaging Platform checks privacy requirements at each launch and presents applicable consent choices before any ads are requested. Settings provides an ad privacy options entry point to revisit applicable choices.
+
+Google's advertising SDK collects and shares the device IP address (which may indicate approximate location), advertising and other device/account identifiers, interactions such as ad views and taps, and app/SDK performance diagnostics. These support advertising, measurement, analytics, and fraud prevention. Data is encrypted in transit. Ad personalization and available ad types depend on your privacy choices, region, and Google's policies. RaceGlyph does not add a separate marketing analytics SDK. See [Google's advertising data disclosure](https://developers.google.com/admob/android/privacy/play-data-disclosure) and [Google Privacy Policy](https://policies.google.com/privacy) for Google's handling and retention practices.
+
+You can reset or delete your Android advertising ID in your device settings and revisit applicable advertising privacy choices in RaceGlyph Settings. Deleting local RaceGlyph data clears the locally stored age selection and consent state; it does not delete information already processed by Google. Contact Google through its privacy controls for requests concerning that data.
+
+## Other information RaceGlyph does not collect
+
+RaceGlyph does not require an account and does not include chat, contact-list access, photo or media access, or microphone access. Your saved custom circuits, race results, and Nearby player names are not provided to the advertising SDK by RaceGlyph.
 
 ## Children
 
